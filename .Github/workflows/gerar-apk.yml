@@ -1,16 +1,19 @@
 name: Gerar APK com GPS Segundo Plano
 
 on:
-  workflow_dispatch: # Permite rodar clicando em um botão
+  push:
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
   build-android:
     runs-on: ubuntu-latest
     steps:
-      - name: Baixar código do repositório
+      - name: Baixar codigo
         uses: actions/checkout@v4
 
-      - name: Configurar Node.js
+      - name: Configurar Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -27,7 +30,7 @@ jobs:
           npx cap add android
           npx cap sync android
 
-      - name: Adicionar permissões de GPS em segundo plano
+      - name: Adicionar permissoes de GPS em segundo plano
         run: |
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           sed -i 's/<application/<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" \/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" \/>\n    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" \/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" \/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" \/>\n    <application/' $MANIFEST
