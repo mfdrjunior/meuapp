@@ -1,34 +1,21 @@
 name: Gerar APK
-
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
-
+on: [push]
 jobs:
-  build-android:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-      - name: Instalar e Gerar Android
-        run: |
-          npm install
-          npx cap add android
-          npx cap sync android
-          MANIFEST="android/app/src/main/AndroidManifest.xml"
-          sed -i 's/<application/<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" \/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" \/>\n    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" \/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" \/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" \/>\n    <application/' $MANIFEST
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleDebug
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: Folha-QRU-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 20
+    - uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+    - run: npm install && npx cap add android && npx cap sync android
+    - run: sed -i 's/<application/<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" \/><uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" \/><uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" \/><uses-permission android:name="android.permission.FOREGROUND_SERVICE" \/><uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" \/><application/' android/app/src/main/AndroidManifest.xml
+    - run: cd android && chmod +x gradlew && ./gradlew assembleDebug
+    - uses: actions/upload-artifact@v4
+      with:
+        name: Folha-QRU-APK
+        path: android/app/build/outputs/apk/debug/app-debug.apk
