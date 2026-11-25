@@ -1,1 +1,6 @@
-
+{
+  "appId": "br.gov.sp.pm.folhaqru",
+  "appName": "Folha QRU",
+  "webDir": "www",
+  "bundledWebRuntime": false
+}
