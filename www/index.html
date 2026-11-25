@@ -366,31 +366,102 @@
       }
     }
   }
+  function processarPosicaoGps(lat, lon) {
+    // Verifica se já deu o tempo (1h ou 2h) mesmo com a tela apagada
+    var radioH = document.querySelector('input[name="gps-h"]:checked');
+    var h = radioH ? parseInt(radioH.value, 10) : 1;
+    if (blkStart && (new Date() - blkStart >= h * 3600000)) {
+      fecharBlocoGps();
+    }
+
+    if (!lastPos || Math.abs(lat - lastPos.lat) + Math.abs(lon - lastPos.lon) > 0.0015) {
+      lastPos = { lat: lat, lon: lon };
+      fetch("https://openstreetmap.org" + lat + "&lon=" + lon + "&accept-language=pt-BR", {
+        headers: { "User-Agent": "FolhaQRUApp/1.0" }
+      })
+        .then(function(r) { return r.json(); })
+        .then(function(j) {
+          var b = (j.address && (j.address.suburb || j.address.neighbourhood || j.address.quarter)) || "";
+          if (b && bairros.indexOf(b) === -1) {
+            bairros.push(b);
+            saveAll();
+          }
+          $("gps-info").textContent = "Bairros: " + (bairros.join(", ") || "buscando...");
+        }).catch(function() {});
+    }
+  }
 
   function startGps() {
-    if (!navigator.geolocation) return alert("Sem GPS.");
     if (!blkStart) { blkStart = new Date(); bairros = new Array(); }
-    $("b-gps-on").style.display = "none"; $("b-gps-off").style.display = "inline-block"; $("gps-info").textContent = "GPS ativo...";
-    watchId = navigator.geolocation.watchPosition(function(p) {
-      var lat = p.coords.latitude, lon = p.coords.longitude;
-      if (!lastPos || Math.abs(lat - lastPos.lat) + Math.abs(lon - lastPos.lon) > 0.0015) {
-        lastPos = { lat: lat, lon: lon };
-        fetch("https://openstreetmap.org" + lat + "&lon=" + lon + "&accept-language=pt-BR")
-          .then(function(r) { return r.json(); })
-          .then(function(j) {
-            var b = (j.address && (j.address.suburb || j.address.neighbourhood || j.address.quarter)) || "";
-            if (b && bairros.indexOf(b) === -1) { bairros.push(b); saveAll(); }
-            $("gps-info").textContent = "Bairros: " + (bairros.join(", ") || "buscando...");
-          }).catch(function() {});
-      }
-    }, function(err) { $("gps-info").textContent = "Aviso GPS: " + err.message; }, { enableHighAccuracy: true });
+    $("b-gps-on").style.display = "none";
+    $("b-gps-off").style.display = "inline-block";
+    $("gps-info").textContent = "GPS ativo...";
+
+    var BgGps = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BackgroundGeolocation;
+
+    if (BgGps) {
+      // MODO APLICATIVO (Funciona em segundo plano com tela bloqueada)
+      BgGps.addWatcher(
+        {
+          backgroundTitle: "Patrulhamento GPS Ativo",
+          backgroundMessage: "Registrando bairros para Folha de QRU.",
+          requestPermissions: true,
+          stale: false,
+          distanceFilter: 20
+        },
+        function(location, error) {
+          if (error) {
+            if (error.code === "NOT_AUTHORIZED") {
+              if (confirm("Ative a permissão de localização 'Permitir o tempo todo' nas configurações.")) {
+                BgGps.openSettings();
+              }
+            }
+            $("gps-info").textContent = "Aviso GPS: " + (error.message || error.code);
+            return;
+          }
+          if (location) {
+            processarPosicaoGps(location.latitude, location.longitude);
+          }
+        }
+      ).then(function(id) {
+        watchId = id;
+      });
+    } else {
+      // MODO NAVEGADOR (Fallback caso abra no Chrome/Safari)
+      if (!navigator.geolocation) return alert("Sem GPS.");
+      watchId = navigator.geolocation.watchPosition(function(p) {
+        processarPosicaoGps(p.coords.latitude, p.coords.longitude);
+      }, function(err) {
+        $("gps-info").textContent = "Aviso GPS: " + err.message;
+      }, { enableHighAccuracy: true });
+    }
+
     timerId = setInterval(function() {
-      var h = parseInt(document.querySelector('input[name="gps-h"]:checked').value, 10);
+      var radioH = document.querySelector('input[name="gps-h"]:checked');
+      var h = radioH ? parseInt(radioH.value, 10) : 1;
       if (new Date() - blkStart >= h * 3600000) fecharBlocoGps();
     }, 20000);
   }
 
-  function stopGps() { if (watchId) navigator.geolocation.clearWatch(watchId); if (timerId) clearInterval(timerId); $("b-gps-on").style.display = "inline-block"; $("b-gps-off").style.display = "none"; $("gps-info").textContent = "GPS pausado."; }
+  function stopGps() {
+    var BgGps = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BackgroundGeolocation;
+    if (watchId !== null && watchId !== undefined) {
+      if (BgGps && typeof watchId === "string") {
+        BgGps.removeWatcher({ id: watchId });
+      } else if (navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+      watchId = null;
+    }
+    if (timerId) {
+      clearInterval(timerId);
+      timerId = null;
+    }
+    $("b-gps-on").style.display = "inline-block";
+    $("b-gps-off").style.display = "none";
+    $("gps-info").textContent = "GPS pausado.";
+  }
+
   function fmtHora(d) { return two(d.getHours()) + ":" + two(d.getMinutes()); }
 
   function fecharBlocoGps() {
