@@ -1,1 +1,12 @@
-
+{
+  "name": "folha-qru",
+  "version": "1.0.0",
+  "description": "Folha de QRU/Relatório",
+  "dependencies": {
+    "@capacitor-community/background-geolocation": "^1.2.26",
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/cli": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/ios": "^6.0.0"
+  }
+}
