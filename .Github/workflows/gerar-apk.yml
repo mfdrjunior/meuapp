@@ -46,3 +46,4 @@ jobs:
         with:
           name: Folha-QRU-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          
