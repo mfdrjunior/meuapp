@@ -1,0 +1,45 @@
+name: Gerar APK com GPS Segundo Plano
+
+on:
+  workflow_dispatch: # Permite rodar clicando em um botão
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar código do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Instalar Capacitor e Plugins
+        run: |
+          npm install
+          npx cap add android
+          npx cap sync android
+
+      - name: Adicionar permissões de GPS em segundo plano
+        run: |
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          sed -i 's/<application/<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" \/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" \/>\n    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" \/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" \/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" \/>\n    <application/' $MANIFEST
+
+      - name: Compilar APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Salvar APK para Download
+        uses: actions/upload-artifact@v4
+        with:
+          name: Folha-QRU-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
