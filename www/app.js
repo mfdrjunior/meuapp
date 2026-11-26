@@ -1542,7 +1542,9 @@ function gerarDadosResenha() {
     if (vtr) addEspaco();
   }
   if (vtr) {
-    addTopo(vtr);
+    html += '<div class="res-line"><b>' + vtr + '</b></div>';
+    txtWpp += "*" + vtr + "*" + NL;
+    txtPuro += vtr + NL;
   }
 
   var temEquipe = (cmte || mot || seg1 || seg2 || seg3);
@@ -1648,7 +1650,7 @@ function atualizarResenha() {
 }
 
 function centralizarLinhaWpp(txt) {
-  var larguraRef = 38;
+  var larguraRef = 46;
   var pad = Math.max(0, Math.floor((larguraRef - txt.length) / 2));
   return " ".repeat(pad) + "*" + txt + "*";
 }
