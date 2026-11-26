@@ -538,26 +538,36 @@ function montarUrlComParams(baseUrl, paramsObj) {
   return baseUrl + String.fromCharCode(63) + partes.join(String.fromCharCode(38));
 }
 
+function parseJsonSeguro(raw) {
+  if (!raw) throw new Error("Resposta vazia");
+  if (typeof raw === "object") return raw;
+  var txt = String(raw).trim();
+  if (txt.charAt(0) !== "{") throw new Error("Resposta não JSON");
+  return JSON.parse(txt);
+}
+
 function httpGetJson(url, paramsObj) {
   var fullUrl = montarUrlComParams(url, paramsObj);
-  var CapHttp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp;
-  if (CapHttp && CapHttp.get) {
-    return CapHttp.get({
-      url: fullUrl,
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36"
+  return fetch(fullUrl)
+    .then(function(r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.text();
+    })
+    .then(function(txt) {
+      return parseJsonSeguro(txt);
+    })
+    .catch(function() {
+      var CapHttp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp;
+      if (CapHttp && CapHttp.get) {
+        return CapHttp.get({ url: fullUrl }).then(function(res) {
+          if (res.status >= 200 && res.status < 300) {
+            return parseJsonSeguro(res.data);
+          }
+          throw new Error("Status " + res.status);
+        });
       }
-    }).then(function(res) {
-      if (res.status >= 200 && res.status < 300) {
-        return typeof res.data === "string" ? JSON.parse(res.data) : res.data;
-      }
-      throw new Error("Status " + res.status);
+      throw new Error("Sem conexão");
     });
-  }
-  return fetch(fullUrl).then(function(r) {
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    return r.json();
-  });
 }
 
 function consultarBairroApi(lat, lon) {
@@ -602,18 +612,6 @@ function consultarBairroApi(lat, lon) {
         var c2 = props.city || props.town || props.county || "";
         if (b2) return { bairro: b2, cidade: c2 };
         throw new Error("Sem bairro Photon");
-      });
-    })
-    .catch(function() {
-      return httpGetJson("https://openstreetmap.org", {
-        format: "jsonv2",
-        lat: latStr,
-        lon: lonStr,
-        "accept-language": "pt-BR"
-      }).then(function(j3) {
-        var b3 = (j3.address && (j3.address.suburb || j3.address.neighbourhood || j3.address.quarter || j3.address.city_district)) || "";
-        var c3 = (j3.address && (j3.address.city || j3.address.town || j3.address.village)) || "";
-        return { bairro: b3, cidade: c3 };
       });
     });
 }
