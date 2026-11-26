@@ -1,7 +1,7 @@
 {
   "name": "Folha de QRU / Relatório de Patrulhamento",
   "short_name": "Folha de QRU",
-  "description": "Gerador de Folha de QRU, Resenha e Qualificação",
+  "description": "Gerador de Folha de QRU, Resenha, MDIP e Qualificação",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
