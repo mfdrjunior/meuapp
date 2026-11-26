@@ -230,7 +230,10 @@ function formatarTextoMilitar(raw) {
   txt = txt.replace(/\b([a-zA-Z])-?([0-9]{4,5})\b/g, function(all, l, n) {
     return l.toUpperCase() + "-" + n;
   });
-  txt = txt.replace(/\b()\s*[°º]?\s*(sgt|ten|sargento|tenente)\s*(?:pm\s+)?([a-zA-ZÀ-ÿ]+)/gi, function(all, n, g, nome) {
+    txt = txt.replace(/\b(ten(?:ente)?\s*cel(?:onel)?|tencel|tc)\s*(?:pm\s+)?([a-zA-ZÀ-ÿ]+)/gi, function(all, g, nome) {
+    return "Ten Cel PM " + titleCase(nome);
+  });
+  txt = txt.replace(/\b([1-3])\s*[°º]?\s*(sgt|ten|sargento|tenente)\s*(?:pm\s+)?([a-zA-ZÀ-ÿ]+)/gi, function(all, n, g, nome) {
     return n + "° " + (g.toLowerCase().indexOf("ten") === 0 ? "Ten" : "Sgt") + " PM " + titleCase(nome);
   });
   txt = txt.replace(/\b(sd|soldado|cb|cabo|sgt|sargento|ten|tenente|cap|capit[aã]o|maj|major|cel|coronel|subten|asp)\s*(?:pm\s+)?([a-zA-ZÀ-ÿ]+)/gi, function(all, g, nome) {
@@ -334,8 +337,8 @@ function formatRankAndName(raw) {
   var w0 = words.slice(0, 1).join("").replace("°", "").replace("º", "");
   if (isNum(w0) && (w0 === "1" || w0 === "2" || w0 === "3")) { numPrefix = w0 + "° "; idx = 1; }
   var rank = "", cur = words.slice(idx, idx + 1).join("").toLowerCase().replace(".", ""), next = words.slice(idx + 1, idx + 2).join("").toLowerCase().replace(".", "");
-  if ((cur === "tenente" || cur === "ten") && (next === "cel" || next === "coronel")) { rank = "Tenente Cel"; idx += 2; }
-  else if (cur === "tc" || cur === "tencel") { rank = "Tenente Cel"; idx += 1; }
+  if ((cur === "tenente" || cur === "ten") && (next === "cel" || next === "coronel")) { rank = "Ten Cel"; idx += 2; }
+  else if (cur === "tc" || cur === "tencel") { rank = "Ten Cel"; idx += 1; }
   else if (cur === "sd" || cur === "soldado") { rank = "Sd"; idx += 1; }
   else if (cur === "cb" || cur === "cabo") { rank = "Cb"; idx += 1; }
   else if (cur === "sgt" || cur === "sargento") { rank = "Sgt"; idx += 1; }
