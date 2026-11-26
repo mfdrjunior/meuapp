@@ -2003,7 +2003,7 @@ function gerarDadosMdip() {
       if ((curF.rg || "").trim()) addCampo("RG", formatarRgTexto(curF.rg));
       if ((curF.mae || "").trim()) addCampo("Mãe", curF.mae.trim());
       if ((curF.criminal || "").trim()) addCampo("Criminal", curF.criminal.trim());
-      if ((curF.obs || "").trim()) addCampo("Observação (Características/Vestimenta)", curF.obs.trim());
+      if ((curF.obs || "").trim()) addCampo("Observação (Características/Vestimentas)", curF.obs.trim());
     }
   }
 
