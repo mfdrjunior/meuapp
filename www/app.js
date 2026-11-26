@@ -559,37 +559,36 @@ function httpGetJson(url, paramsObj) {
 }
 
 function consultarBairroApi(lat, lon) {
-  var NativeGeo = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.NativeGeocoder;
-  var tentarNativo = (NativeGeo && NativeGeo.reverseGeocode)
-    ? NativeGeo.reverseGeocode({
-        latitude: Number(lat),
-        longitude: Number(lon),
-        useLocale: true,
-        maxResults: 3
-      }).then(function(res) {
-        var lista = (res && res.addresses) ? res.addresses : (Array.isArray(res) ? res : new Array());
-        if (lista.length > 0) {
-          var end = lista.slice(0, 1).pop();
-          var bNat = end.subLocality || end.subAdministrativeArea || end.thoroughfare || "";
-          var cNat = end.locality || end.subAdministrativeArea || "";
-          if (bNat) return { bairro: bNat, cidade: cNat };
-        }
-        throw new Error("Sem bairro nativo");
-      })
-    : Promise.reject(new Error("Sem plugin nativo"));
-
-  return tentarNativo.catch(function() {
-    var urlArcGis = new Array("https:/", "://arcgis.com", "arcgis", "rest", "services", "World", "GeocodeServer", "reverseGeocode").join("/");
-    return httpGetJson(urlArcGis, {
-      location: String(lon) + "," + String(lat),
-      langCode: "pt",
-      f: "pjson"
-    }).then(function(j0) {
-      var addr0 = j0 && j0.address ? j0.address : {};
-      var b0 = addr0.Neighborhood || addr0.District || addr0.Subregion || "";
-      var c0 = addr0.City || addr0.MetroArea || "";
-      if (b0) return { bairro: b0, cidade: c0 };
-      throw new Error("Sem bairro ArcGIS");
+  var urlArcGis = new Array("https:/", "://arcgis.com", "arcgis", "rest", "services", "World", "GeocodeServer", "reverseGeocode").join("/");
+  return httpGetJson(urlArcGis, {
+    location: String(lon) + "," + String(lat),
+    langCode: "pt",
+    f: "pjson"
+  }).then(function(j0) {
+    var addr0 = j0 && j0.address ? j0.address : {};
+    var c0 = addr0.City || addr0.Subregion || "";
+    var b0 = addr0.Neighborhood || "";
+    if (!b0 && addr0.District && addr0.District.toLowerCase() !== c0.toLowerCase()) {
+      b0 = addr0.District;
+    }
+    if (b0) return { bairro: b0, cidade: c0 };
+    throw new Error("Apenas cidade no ArcGIS");
+  }).catch(function() {
+    var urlNom = new Array("https:/", "nominatim.openstreetmap.org", "reverse").join("/");
+    return httpGetJson(urlNom, {
+      format: "jsonv2",
+      lat: String(lat),
+      lon: String(lon),
+      zoom: "16",
+      "accept-language": "pt-BR"
+    }).then(function(j3) {
+      var a3 = j3 && j3.address ? j3.address : {};
+      var c3 = a3.city || a3.town || a3.municipality || "";
+      var b3 = a3.suburb || a3.neighbourhood || a3.quarter || a3.city_district || a3.residential || "";
+      if (b3 && b3.toLowerCase() !== c3.toLowerCase()) {
+        return { bairro: b3, cidade: c3 };
+      }
+      throw new Error("Sem bairro Nominatim");
     });
   }).catch(function() {
     var urlBdc = new Array("https:/", "api.bigdatacloud.net", "data", "reverse-geocode-client").join("/");
@@ -598,14 +597,20 @@ function consultarBairroApi(lat, lon) {
       longitude: String(lon),
       localityLanguage: "pt"
     }).then(function(j) {
-      var bairro = j.locality || "";
       var cidade = j.city || "";
-      if (!bairro && j.localityInfo && j.localityInfo.administrative) {
+      var bairro = "";
+      if (j.localityInfo && j.localityInfo.administrative) {
         var adm = j.localityInfo.administrative;
-        if (adm.length > 0) bairro = adm[adm.length - 1].name || "";
+        for (var i = adm.length - 1; i >= 0; i--) {
+          var nomeAdm = adm[i].name || "";
+          if (nomeAdm && nomeAdm.toLowerCase() !== cidade.toLowerCase() && (adm[i].adminLevel >= 9 || i === adm.length - 1)) {
+            bairro = nomeAdm;
+            break;
+          }
+        }
       }
-      if (bairro) return { bairro: bairro, cidade: cidade };
-      throw new Error("Sem bairro BDC");
+      if (!bairro) bairro = j.locality || cidade;
+      return { bairro: bairro, cidade: cidade };
     });
   });
 }
