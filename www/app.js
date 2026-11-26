@@ -9,7 +9,9 @@ var NL = String.fromCharCode(10);
 var IMAGEM_PADRAO = "./fundo.png";
 var fotoQualBase64 = "";
 var fotoQualFinalBase64 = "";
-var resenhaEnvolvidos = new Array({ tipo: "Indiciado", nome: "", rg: "", artigo: "" });
+var resenhaIndiciados = new Array({ nome: "", rg: "", artigo: "" });
+var resenhaSindicados = new Array({ nome: "", rg: "", artigo: "" });
+var mdipFeridos = new Array({ naoIdentificado: false, nome: "", rg: "", mae: "", criminal: "", obs: "" });
 
 function $(id) { return document.getElementById(id); }
 function sGet(k) {
@@ -39,6 +41,7 @@ function mostrarTela(telaId) {
   $("saved-screen").style.display = "none";
   $("qual-screen").style.display = "none";
   $("resenha-screen").style.display = "none";
+  $("mdip-screen").style.display = "none";
   $(telaId).style.display = "block";
   window.scrollTo(0, 0);
 }
@@ -47,7 +50,8 @@ function voltarInicio() { saveAll(); updateCount(); mostrarTela("home-screen"); 
 function abrirCabecalho() { if (!$("f-data").value.trim()) $("f-data").value = getToday(); atualizarTelaCabecalho(); mostrarTela("header-screen"); }
 function editarCabecalho() { saveAll(); atualizarTelaCabecalho(); mostrarTela("header-screen"); }
 function abrirSalvos() { $("saved-detail").style.display = "none"; renderSaved(); mostrarTela("saved-screen"); }
-function abrirResenha() { renderizarEnvolvidosResenha(); atualizarResenha(); mostrarTela("resenha-screen"); }
+function abrirResenha() { renderizarIndiciadosResenha(); renderizarSindicadosResenha(); atualizarResenha(); mostrarTela("resenha-screen"); }
+function abrirMdip() { renderizarFeridosMdip(); atualizarMdip(); mostrarTela("mdip-screen"); }
 
 function atualizarFundo() {
   var home = $("home-screen");
@@ -80,7 +84,27 @@ function removeBg() {
 
 function titleCase(s) {
   if (!s) return "";
-  return s.trim().toLowerCase().split(" ").filter(function(x) { return x !== ""; }).map(function(w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(" ");
+  var minusculas = new Array("de", "da", "do", "das", "dos", "e", "em", "na", "no", "nas", "nos");
+  return s.trim().toLowerCase().split(" ").filter(function(x) { return x !== ""; }).map(function(w, idx) {
+    if (idx > 0 && minusculas.indexOf(w) > -1) return w;
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  }).join(" ");
+}
+
+function formatarTextoMilitar(raw) {
+  var txt = (raw || "").trim();
+  if (!txt) return "";
+  txt = txt.replace(/\b([0-9]+)\s*[ªa]?\s*cia\s+(?:baep|aep)\b/gi, "$1ª Cia AEP");
+  txt = txt.replace(/\b([0-9]+)\s*[ªa]?\s*cia\s+([0-9]+)\s*[°º]?\s*(?:bpm\/?i|i)\b/gi, "$1ª Cia - $2º BPM/I");
+  txt = txt.replace(/\b([0-9]+)\s*[ªa]?\s*cia\s+([0-9]+)\s*[°º]?\s*(?:bpm\/?m|m)\b/gi, "$1ª Cia - $2º BPM/M");
+  txt = txt.replace(/\b([0-9]+)\s*[ªa]?\s*cia\b/gi, "$1ª Cia");
+  txt = txt.replace(/\b([0-9]+)\s*[°º]?\s*(?:bpm\/?i|i)\b/gi, "$1º BPM/I");
+  txt = txt.replace(/\b([0-9]+)\s*[°º]?\s*(?:bpm\/?m|m)\b/gi, "$1º BPM/M");
+  txt = txt.replace(/\b([0-9]+)\s*[°º]?\s*baep\b/gi, "$1º BAEP");
+  txt = txt.replace(/\b([0-9]+)\s*[°º]?\s*bpchq\b/gi, "$1º BPChq");
+  txt = txt.replace(/\b([0-9]+)\s*[°º]?\s*dp\b/gi, "$1º DP");
+  txt = txt.replace(/\bdp\b/gi, "DP");
+  return txt;
 }
 
 function resolverNomeBatalhao(raw) {
@@ -96,9 +120,9 @@ function resolverNomeBatalhao(raw) {
 
   if (up.indexOf("ROTA") > -1) {
     res = "Batalhão Tobias de Aguiar";
-  } else if (up.indexOf("BPMI") > -1 || (num !== "" && semNum === "I")) {
+  } else if (up.indexOf("BPMI") > -1 || up.indexOf("BPM/I") > -1 || (num !== "" && semNum === "I")) {
     res = (num ? num + "º " : "") + "Batalhão de Polícia Militar do Interior";
-  } else if (up.indexOf("BPMM") > -1 || (num !== "" && semNum === "M")) {
+  } else if (up.indexOf("BPMM") > -1 || up.indexOf("BPM/M") > -1 || (num !== "" && semNum === "M")) {
     res = (num ? num + "º " : "") + "Batalhão de Polícia Militar Metropolitano";
   } else if (up.indexOf("BPCHQ") > -1) {
     res = (num ? num + "º " : "") + "Batalhão de Polícia de Choque";
@@ -124,28 +148,32 @@ function formatarSiglaBatalhaoCurta(raw) {
   var v = (raw || "").trim();
   if (!v) return "";
   var up = v.toUpperCase();
-  var m = up.match(/^([0-9]+)\s*[°º]?\s*(BAEP|BPMI|BPM\/I|BPMM|BPM\/M|BPCHQ|CAEP|PAEP)(.*)$/);
+  var m = up.match(/^([0-9]+)\s*[°º]?\s*(BAEP|BPMI|BPM\/I|I|BPMM|BPM\/M|M|BPCHQ|CAEP|PAEP)(.*)$/);
   if (m) {
     var num = m[1];
     var tipo = m[2];
-    var resto = m[3] ? m[3].trim() : "";
-    if (tipo === "BPMI") tipo = "BPM/I";
-    if (tipo === "BPMM") tipo = "BPM/M";
+    var resto = m[3] ? titleCase(m[3].trim()) : "";
+    if (tipo === "BPMI" || tipo === "I") tipo = "BPM/I";
+    if (tipo === "BPMM" || tipo === "M") tipo = "BPM/M";
     if (tipo === "BPCHQ") tipo = "BPChq";
-    return num + "° " + tipo + (resto ? " " + resto : "");
+    return num + "º " + tipo + (resto ? " " + resto : "");
   }
-  return v;
+  return formatarTextoMilitar(v);
 }
 
 function formatarDpTexto(raw) {
   var v = (raw || "").trim();
   if (!v) return "";
   if (isNum(v)) return v + "º DP";
-  var m = v.match(/^([0-9]+)\s*[°º]?\s*DP(.*)$/i);
-  if (m) {
-    return m[1] + "º DP" + (m[2] ? m[2] : "");
+  var txt = formatarTextoMilitar(v);
+  var partes = txt.split(" ");
+  for (var i = 0; i < partes.length; i++) {
+    var p = partes[i];
+    if (p !== "DP" && p.indexOf("º") === -1 && p.indexOf("ª") === -1 && p.indexOf("/") === -1 && p !== "BPM/I" && p !== "BPM/M" && p !== "BAEP") {
+      partes[i] = titleCase(p);
+    }
   }
-  return v;
+  return partes.join(" ");
 }
 function onUnitChange() {
   var res = resolverNomeBatalhao($("f-uni").value);
@@ -221,6 +249,7 @@ function formatCiaInput() {
   else if (up === "CAVALARIA") { $("f-cia").value = "Cavalaria"; saveAll(); }
   else if (up === "ROCAM") { $("f-cia").value = "ROCAM"; saveAll(); }
   else if (isNum(v)) { $("f-cia").value = v + "ª"; saveAll(); }
+  else if (v) { $("f-cia").value = formatarTextoMilitar(v); saveAll(); }
 }
 
 function formatPelInput() {
@@ -228,17 +257,23 @@ function formatPelInput() {
   if (isNum(v)) { $("f-pel").value = v + "°"; saveAll(); }
 }
 
-function formatVtrInput() {
-  var el = $("f-vtr");
-  var v = el.value.trim();
-  if (!v) return;
+function formatVtrTexto(raw) {
+  var v = (raw || "").trim();
+  if (!v) return "";
   var primeira = v.charAt(0).toUpperCase();
   if (primeira >= "A" && primeira <= "Z") {
     var resto = v.slice(1).trim();
     if (resto.charAt(0) === "-") resto = resto.slice(1).trim();
-    el.value = resto ? primeira + "-" + resto : primeira;
-    saveAll();
+    return resto ? primeira + "-" + resto : primeira;
   }
+  return v;
+}
+
+function formatVtrInput() {
+  var el = $("f-vtr");
+  if (!el || !el.value.trim()) return;
+  el.value = formatVtrTexto(el.value);
+  saveAll();
 }
 
 function calcKm() {
@@ -334,13 +369,31 @@ function onBodyKey(e) {
     }
   }
 }
+function httpGetJson(url) {
+  var CapHttp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp;
+  if (CapHttp && CapHttp.get) {
+    return CapHttp.get({
+      url: url,
+      headers: {
+        "Accept": "application/json",
+        "User-Agent": "FolhaDeQRU-Android/1.0"
+      }
+    }).then(function(res) {
+      if (res.status >= 200 && res.status < 300) {
+        return typeof res.data === "string" ? JSON.parse(res.data) : res.data;
+      }
+      throw new Error("Status " + res.status);
+    });
+  }
+  return fetch(url).then(function(r) {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  });
+}
+
 function consultarBairroApi(lat, lon) {
   var url1 = "https://bigdatacloud.net" + lat + "&longitude=" + lon + "&localityLanguage=pt";
-  return fetch(url1)
-    .then(function(r) {
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      return r.json();
-    })
+  return httpGetJson(url1)
     .then(function(j) {
       var bairro = j.locality || "";
       var cidade = j.city || "";
@@ -352,14 +405,23 @@ function consultarBairroApi(lat, lon) {
       throw new Error("Sem bairro");
     })
     .catch(function() {
-      var url2 = "https://openstreetmap.org" + lat + "&lon=" + lon + "&accept-language=pt-BR";
-      return fetch(url2)
-        .then(function(r2) { return r2.json(); })
-        .then(function(j2) {
-          var b2 = (j2.address && (j2.address.suburb || j2.address.neighbourhood || j2.address.quarter || j2.address.city_district)) || "";
-          var c2 = (j2.address && (j2.address.city || j2.address.town || j2.address.village)) || "";
-          return { bairro: b2, cidade: c2 };
-        });
+      var url2 = "https://komoot.io" + lon + "&lat=" + lat;
+      return httpGetJson(url2).then(function(j2) {
+        var feat = j2 && j2.features && j2.features.length > 0 ? j2.features[0] : null;
+        var props = feat ? feat.properties : {};
+        var b2 = props.district || props.suburb || props.neighbourhood || props.locality || props.name || "";
+        var c2 = props.city || props.town || props.county || "";
+        if (b2) return { bairro: b2, cidade: c2 };
+        throw new Error("Sem bairro Photon");
+      });
+    })
+    .catch(function() {
+      var url3 = "https://openstreetmap.org" + lat + "&lon=" + lon + "&accept-language=pt-BR";
+      return httpGetJson(url3).then(function(j3) {
+        var b3 = (j3.address && (j3.address.suburb || j3.address.neighbourhood || j3.address.quarter || j3.address.city_district)) || "";
+        var c3 = (j3.address && (j3.address.city || j3.address.town || j3.address.village)) || "";
+        return { bairro: b3, cidade: c3 };
+      });
     });
 }
 
@@ -475,7 +537,7 @@ function fmtHora(d) { return two(d.getHours()) + ":" + two(d.getMinutes()); }
 
 function fecharBlocoGps() {
   var now = new Date(), ini = fmtHora(blkStart || now), fim = fmtHora(now);
-  var txtB = bairros.length ? bairros.join(", ") : "área da companhia";
+  var txtB = bairros.length ? bairros.join(", ") : "             ";
   addItem("Das " + ini + " às " + fim + " - Patrulhamento pelos bairros " + txtB + ".");
   blkStart = new Date(now.getTime() + 60000); bairros = new Array(); saveAll();
 }
@@ -645,11 +707,15 @@ function abrirCameraQualificacao() {
 function formatarRgTexto(raw) {
   var v = (raw || "").trim();
   if (!v) return "";
-  if (/^[0-9]{2}\.[0-9]{3}\.[0-9]{2}-[0-9]$/.test(v) || /^[0-9]{2}\.[0-9]{3}\.[0-9]{3}$/.test(v)) {
-    return v;
+  if (/^[0-9]{2}\.[0-9]{3}\.[0-9]{3}-[0-9X]$/i.test(v) || /^[0-9]{2}\.[0-9]{3}\.[0-9]{3}$/.test(v) || /^[0-9]{2}\.[0-9]{3}\.[0-9]{2}-[0-9]$/.test(v)) {
+    return v.toUpperCase();
+  }
+  if (/^[0-9]{8}[0-9X]$/i.test(v)) {
+    var up = v.toUpperCase();
+    return up.slice(0, 2) + "." + up.slice(2, 5) + "." + up.slice(5, 8) + "-" + up.slice(8, 9);
   }
   if (/^[0-9]{8}$/.test(v)) {
-    return v.slice(0, 2) + "." + v.slice(2, 5) + "." + v.slice(5, 7) + "-" + v.slice(7, 8);
+    return v.slice(0, 2) + "." + v.slice(2, 5) + "." + v.slice(5, 8);
   }
   return v;
 }
@@ -661,6 +727,7 @@ function formatarRgQual() {
 
 function formatarDataQual(idCampo) {
   var el = $(idCampo);
+  if (!el) return;
   var v = el.value.trim();
   if (!v) return;
   if (/^[0-9]{8}$/.test(v)) {
@@ -681,6 +748,13 @@ function formatarDpQual() {
   var el = $("q-dp");
   if (el && el.value.trim()) {
     el.value = formatarDpTexto(el.value);
+  }
+}
+
+function formatarCidadeQual() {
+  var el = $("q-cidade");
+  if (el && el.value.trim()) {
+    el.value = titleCase(el.value);
   }
 }
 
@@ -742,6 +816,7 @@ function gerarPlacaQualificacao() {
   formatarDataQual("q-data");
   formatarDataQual("q-dtn");
   formatarDpQual();
+  formatarCidadeQual();
 
   var img = new Image();
   img.onload = function() {
@@ -760,28 +835,27 @@ function gerarPlacaQualificacao() {
 
     ctx.drawImage(img, 0, 0, largura, altura);
 
-    var margemExt = Math.round(largura * 0.015);
-    var placaW = largura - (margemExt * 2);
-    var padX = Math.round(placaW * 0.03);
+    var placaX = 0;
+    var placaW = largura;
+    var padX = Math.round(placaW * 0.032);
     var innerW = placaW - (padX * 2);
 
-    var fontTitulo = Math.max(24, Math.round(largura * 0.042));
-    var fontLbl = Math.max(11, Math.round(largura * 0.016));
-    var fontVal = Math.max(15, Math.round(largura * 0.023));
+    var fontTitulo = Math.max(24, Math.round(largura * 0.044));
+    var fontLbl = Math.max(11, Math.round(largura * 0.0165));
+    var fontVal = Math.max(15, Math.round(largura * 0.0235));
 
-    var alturaMinimaPlaca = Math.round(altura * 0.35);
-    var topoEspaco = Math.round(fontTitulo * 2.2);
+    var alturaMinimaPlaca = Math.round(altura * 0.40);
+    var topoEspaco = Math.round(fontTitulo * 2.4);
     var rodapeEspaco = Math.round(padX * 1.1);
     var areaLinhas = alturaMinimaPlaca - topoEspaco - rodapeEspaco;
-    var rowGap = Math.max(Math.round(fontVal * 1.75), Math.floor(areaLinhas / 7));
+    var rowGap = Math.max(Math.round(fontVal * 1.85), Math.floor(areaLinhas / 7));
 
     var placaH = topoEspaco + (7 * rowGap) + rodapeEspaco;
-    var placaX = margemExt;
-    var placaY = altura - placaH - margemExt;
-    if (placaY < 10) placaY = 10;
+    var placaY = altura - placaH;
+    if (placaY < 0) placaY = 0;
 
     ctx.save();
-    retanguloArredondado(ctx, placaX, placaY, placaW, placaH, Math.round(largura * 0.03));
+    retanguloArredondado(ctx, placaX, placaY, placaW, placaH, Math.round(largura * 0.032));
     ctx.fillStyle = "#ffffff";
     ctx.fill();
     ctx.lineWidth = 2;
@@ -789,7 +863,7 @@ function gerarPlacaQualificacao() {
     ctx.stroke();
     ctx.restore();
 
-    var y = placaY + Math.round(fontTitulo * 1.15);
+    var y = placaY + Math.round(fontTitulo * 1.2);
     var batalhao = $("q-uni").value.trim().toUpperCase();
     if (batalhao) {
       ctx.fillStyle = "#000000";
@@ -801,7 +875,7 @@ function gerarPlacaQualificacao() {
     ctx.textAlign = "left";
     var x0 = placaX + padX;
     var gapCol = Math.round(innerW * 0.02);
-    y += Math.round(fontTitulo * 1.35);
+    y += Math.round(fontTitulo * 1.45);
 
     desenharCampoPlaca(ctx, "NOME:", $("q-nome").value.trim().toUpperCase(), x0, y, innerW, fontLbl, fontVal);
     y += rowGap;
@@ -933,8 +1007,7 @@ function formatarBatResenha() {
   if (!el) return;
   var v = el.value.trim();
   if (!v) return;
-  var up = v.toUpperCase();
-  if (up === "ROTA") {
+  if (v.toUpperCase() === "ROTA") {
     el.value = "ROTA";
   } else {
     el.value = formatarSiglaBatalhaoCurta(v);
@@ -953,25 +1026,15 @@ function formatarCiaResenha() {
   else if (up === "CAVALARIA") el.value = "Cavalaria";
   else if (up === "ROCAM") el.value = "ROCAM";
   else if (isNum(v)) el.value = v + "ª Cia";
-  else {
-    var m = v.match(/^([0-9]+)\s*[ªa]?\s*CIA$/i);
-    if (m) el.value = m + "ª Cia";
-  }
+  else el.value = formatarTextoMilitar(v);
   atualizarResenha();
 }
 
 function formatarVtrResenha() {
   var el = $("r-vtr");
-  if (!el) return;
-  var v = el.value.trim();
-  if (!v) return;
-  var primeira = v.charAt(0).toUpperCase();
-  if (primeira >= "A" && primeira <= "Z") {
-    var resto = v.slice(1).trim();
-    if (resto.charAt(0) === "-") resto = resto.slice(1).trim();
-    el.value = resto ? primeira + "-" + resto : primeira;
-    atualizarResenha();
-  }
+  if (!el || !el.value.trim()) return;
+  el.value = formatVtrTexto(el.value);
+  atualizarResenha();
 }
 
 function formatarPolicialResenha(idCampo) {
@@ -985,13 +1048,7 @@ function formatarPolicialResenha(idCampo) {
 function formatarAreaResenha() {
   var el = $("r-area");
   if (!el || !el.value.trim()) return;
-  var txt = el.value.trim();
-  txt = txt.replace(/\b([0-9]+)\s*[ªa]?\s*cia\b/gi, "$1ª Cia");
-  txt = txt.replace(/\b([0-9]+)\s*[°º]?\s*bpm\/?i\b/gi, "$1º BPM/I");
-  txt = txt.replace(/\b([0-9]+)\s*[°º]?\s*bpm\/?m\b/gi, "$1º BPM/M");
-  txt = txt.replace(/\b([0-9]+)\s*[°º]?\s*baep\b/gi, "$1º BAEP");
-  txt = txt.replace(/\b([0-9]+)\s*[°º]?\s*bpchq\b/gi, "$1º BPChq");
-  el.value = txt;
+  el.value = formatarTextoMilitar(el.value);
   atualizarResenha();
 }
 
@@ -1002,56 +1059,112 @@ function formatarDpResenha() {
   atualizarResenha();
 }
 
-function adicionarEnvolvido(tipo) {
-  resenhaEnvolvidos.push({ tipo: tipo, nome: "", rg: "", artigo: "" });
-  renderizarEnvolvidosResenha();
+function adicionarIndiciado() {
+  resenhaIndiciados.push({ nome: "", rg: "", artigo: "" });
+  renderizarIndiciadosResenha();
   atualizarResenha();
 }
 
-function removerEnvolvido(idx) {
-  resenhaEnvolvidos.splice(idx, 1);
-  renderizarEnvolvidosResenha();
+function removerIndiciado(idx) {
+  resenhaIndiciados.splice(idx, 1);
+  renderizarIndiciadosResenha();
   atualizarResenha();
 }
 
-function onEnvolvidoInput(idx, campo, valor) {
-  if (resenhaEnvolvidos[idx]) {
-    resenhaEnvolvidos[idx][campo] = valor;
+function onIndiciadoInput(idx, campo, valor) {
+  if (resenhaIndiciados[idx]) {
+    resenhaIndiciados[idx][campo] = valor;
     atualizarResenha();
   }
 }
 
-function onEnvolvidoRgBlur(idx, inputEl) {
-  if (resenhaEnvolvidos[idx]) {
+function onIndiciadoRgBlur(idx, inputEl) {
+  if (resenhaIndiciados[idx]) {
     var fmt = formatarRgTexto(inputEl.value);
     inputEl.value = fmt;
-    resenhaEnvolvidos[idx].rg = fmt;
+    resenhaIndiciados[idx].rg = fmt;
     atualizarResenha();
   }
 }
 
-function renderizarEnvolvidosResenha() {
-  var box = $("r-envolvidos-box");
+function renderizarIndiciadosResenha() {
+  var box = $("r-indiciados-box");
   if (!box) return;
   var html = "";
-  for (var i = 0; i < resenhaEnvolvidos.length; i++) {
-    var env = resenhaEnvolvidos[i];
+  for (var i = 0; i < resenhaIndiciados.length; i++) {
+    var env = resenhaIndiciados[i];
     var nomeEsc = (env.nome || "").replace(/"/g, "&quot;");
     var rgEsc = (env.rg || "").replace(/"/g, "&quot;");
     var artEsc = (env.artigo || "").replace(/"/g, "&quot;");
     html += '<div class="env-box">' +
       '<div class="row" style="margin-bottom:6px;">' +
-        '<span class="dot"></span><span class="lbl">' + env.tipo + ':</span>' +
-        '<input type="text" value="' + nomeEsc + '" oninput="onEnvolvidoInput(' + i + ', \'nome\', this.value)">' +
-        '<button type="button" class="btn-small" style="background:#dc2626;border:none;padding:6px 10px;" onclick="removerEnvolvido(' + i + ')">X</button>' +
+        '<span class="dot"></span><span class="lbl">Indiciado:</span>' +
+        '<input type="text" value="' + nomeEsc + '" oninput="onIndiciadoInput(' + i + ', \'nome\', this.value)">' +
+        '<button type="button" class="btn-small" style="background:#dc2626;border:none;padding:6px 10px;" onclick="removerIndiciado(' + i + ')">X</button>' +
       '</div>' +
       '<div class="row" style="margin-bottom:6px;">' +
         '<span class="dot"></span><span class="lbl">RG:</span>' +
-        '<input type="text" value="' + rgEsc + '" placeholder="xx.xxx.xx-x ou xx.xxx.xxx" oninput="onEnvolvidoInput(' + i + ', \'rg\', this.value)" onblur="onEnvolvidoRgBlur(' + i + ', this)">' +
+        '<input type="text" value="' + rgEsc + '" placeholder="xx.xxx.xxx-x ou xx.xxx.xxx" oninput="onIndiciadoInput(' + i + ', \'rg\', this.value)" onblur="onIndiciadoRgBlur(' + i + ', this)">' +
       '</div>' +
       '<div class="row" style="margin-bottom:0;">' +
         '<span class="dot"></span><span class="lbl">Artigo:</span>' +
-        '<input type="text" value="' + artEsc + '" oninput="onEnvolvidoInput(' + i + ', \'artigo\', this.value)">' +
+        '<input type="text" value="' + artEsc + '" oninput="onIndiciadoInput(' + i + ', \'artigo\', this.value)">' +
+      '</div>' +
+    '</div>';
+  }
+  box.innerHTML = html;
+}
+
+function adicionarSindicado() {
+  resenhaSindicados.push({ nome: "", rg: "", artigo: "" });
+  renderizarSindicadosResenha();
+  atualizarResenha();
+}
+
+function removerSindicado(idx) {
+  resenhaSindicados.splice(idx, 1);
+  renderizarSindicadosResenha();
+  atualizarResenha();
+}
+
+function onSindicadoInput(idx, campo, valor) {
+  if (resenhaSindicados[idx]) {
+    resenhaSindicados[idx][campo] = valor;
+    atualizarResenha();
+  }
+}
+
+function onSindicadoRgBlur(idx, inputEl) {
+  if (resenhaSindicados[idx]) {
+    var fmt = formatarRgTexto(inputEl.value);
+    inputEl.value = fmt;
+    resenhaSindicados[idx].rg = fmt;
+    atualizarResenha();
+  }
+}
+
+function renderizarSindicadosResenha() {
+  var box = $("r-sindicados-box");
+  if (!box) return;
+  var html = "";
+  for (var i = 0; i < resenhaSindicados.length; i++) {
+    var env = resenhaSindicados[i];
+    var nomeEsc = (env.nome || "").replace(/"/g, "&quot;");
+    var rgEsc = (env.rg || "").replace(/"/g, "&quot;");
+    var artEsc = (env.artigo || "").replace(/"/g, "&quot;");
+    html += '<div class="env-box">' +
+      '<div class="row" style="margin-bottom:6px;">' +
+        '<span class="dot"></span><span class="lbl">Sindicado:</span>' +
+        '<input type="text" value="' + nomeEsc + '" oninput="onSindicadoInput(' + i + ', \'nome\', this.value)">' +
+        '<button type="button" class="btn-small" style="background:#dc2626;border:none;padding:6px 10px;" onclick="removerSindicado(' + i + ')">X</button>' +
+      '</div>' +
+      '<div class="row" style="margin-bottom:6px;">' +
+        '<span class="dot"></span><span class="lbl">RG:</span>' +
+        '<input type="text" value="' + rgEsc + '" placeholder="xx.xxx.xxx-x ou xx.xxx.xxx" oninput="onSindicadoInput(' + i + ', \'rg\', this.value)" onblur="onSindicadoRgBlur(' + i + ', this)">' +
+      '</div>' +
+      '<div class="row" style="margin-bottom:0;">' +
+        '<span class="dot"></span><span class="lbl">Artigo:</span>' +
+        '<input type="text" value="' + artEsc + '" oninput="onSindicadoInput(' + i + ', \'artigo\', this.value)">' +
       '</div>' +
     '</div>';
   }
@@ -1070,9 +1183,9 @@ function formatarDataHoraMilitar(dtRaw, hrRaw) {
     var dtLimpo = dt.replace(/[^0-9A-Z]/g, "");
     var matchMes = dtLimpo.match(/^([0-9]{1,2})([A-Z]{3})([0-9]{2,4})$/);
     if (matchMes) {
-      dia = two(matchMes);
-      mesSigla = matchMes;
-      ano2 = matchMes.slice(-2);
+      dia = two(matchMes[1]);
+      mesSigla = matchMes[2];
+      ano2 = matchMes[3].slice(-2);
     } else {
       var numsDt = dt.replace(/[^0-9]/g, "");
       if (numsDt.length === 8) {
@@ -1210,39 +1323,45 @@ function gerarDadosResenha() {
     addCampo("Delegado", del);
   }
 
-  var totInd = 0, totSind = 0;
-  for (var i = 0; i < resenhaEnvolvidos.length; i++) {
-    var e = resenhaEnvolvidos[i];
-    if ((e.nome || "").trim() !== "" || (e.rg || "").trim() !== "" || (e.artigo || "").trim() !== "") {
-      if (e.tipo === "Indiciado") totInd++;
-      else totSind++;
+  var indValidos = new Array();
+  for (var i = 0; i < resenhaIndiciados.length; i++) {
+    var ind = resenhaIndiciados[i];
+    if ((ind.nome || "").trim() !== "" || (ind.rg || "").trim() !== "" || (ind.artigo || "").trim() !== "") {
+      indValidos.push(ind);
     }
   }
 
-  var temEnvolvidos = (totInd > 0 || totSind > 0);
+  var sindValidos = new Array();
+  for (var s = 0; s < resenhaSindicados.length; s++) {
+    var sind = resenhaSindicados[s];
+    if ((sind.nome || "").trim() !== "" || (sind.rg || "").trim() !== "" || (sind.artigo || "").trim() !== "") {
+      sindValidos.push(sind);
+    }
+  }
+
+  var temEnvolvidos = (indValidos.length > 0 || sindValidos.length > 0);
   if (temEnvolvidos) {
     if (del || temDadosOcor) addEspaco();
-    var cInd = 0, cSind = 0, primeiroEnv = true;
-    for (var j = 0; j < resenhaEnvolvidos.length; j++) {
-      var env = resenhaEnvolvidos[j];
-      var nm = (env.nome || "").trim();
-      var rgVal = formatarRgTexto(env.rg || "");
-      var artVal = (env.artigo || "").trim();
-      if (nm !== "" || rgVal !== "" || artVal !== "") {
-        if (!primeiroEnv) addEspaco();
-        primeiroEnv = false;
-        var lblEnv = env.tipo;
-        if (env.tipo === "Indiciado") {
-          cInd++;
-          if (totInd > 1) lblEnv = "Indiciado " + cInd;
-        } else {
-          cSind++;
-          if (totSind > 1) lblEnv = "Sindicado " + cSind;
-        }
-        if (nm) addCampo(lblEnv, nm);
-        if (rgVal) addCampo("RG", rgVal);
-        if (artVal) addCampo("Artigo", artVal);
-      }
+    var primeiroEnv = true;
+
+    for (var j = 0; j < indValidos.length; j++) {
+      if (!primeiroEnv) addEspaco();
+      primeiroEnv = false;
+      var curInd = indValidos[j];
+      var lblInd = indValidos.length > 1 ? ("Indiciado " + (j + 1)) : "Indiciado";
+      if ((curInd.nome || "").trim()) addCampo(lblInd, curInd.nome.trim());
+      if ((curInd.rg || "").trim()) addCampo("RG", formatarRgTexto(curInd.rg));
+      if ((curInd.artigo || "").trim()) addCampo("Artigo", curInd.artigo.trim());
+    }
+
+    for (var m = 0; m < sindValidos.length; m++) {
+      if (!primeiroEnv) addEspaco();
+      primeiroEnv = false;
+      var curSind = sindValidos[m];
+      var lblSind = sindValidos.length > 1 ? ("Sindicado " + (m + 1)) : "Sindicado";
+      if ((curSind.nome || "").trim()) addCampo(lblSind, curSind.nome.trim());
+      if ((curSind.rg || "").trim()) addCampo("RG", formatarRgTexto(curSind.rg));
+      if ((curSind.artigo || "").trim()) addCampo("Artigo", curSind.artigo.trim());
     }
   }
 
@@ -1282,56 +1401,460 @@ function atualizarResenha() {
   var res = gerarDadosResenha();
   box.innerHTML = res.html;
 }
+
+function obterTextoEditadoResenha(modoWpp) {
+  var box = $("res-preview-box");
+  if (!box) return "";
+  var linhas = new Array();
+  var filhos = box.childNodes;
+  for (var i = 0; i < filhos.length; i++) {
+    var el = filhos[i];
+    if (el.nodeType === 1) {
+      if (el.className === "res-gap") {
+        linhas.push("");
+      } else {
+        var txt = (el.innerText || el.textContent || "").trim();
+        if (modoWpp && (el.className === "res-center" || el.className === "res-title")) {
+          linhas.push("*" + txt + "*");
+        } else if (modoWpp && txt.indexOf(":") > -1 && el.querySelector("b")) {
+          var idxDoisPontos = txt.indexOf(":");
+          var rot = txt.slice(0, idxDoisPontos + 1);
+          var val = txt.slice(idxDoisPontos + 1);
+          linhas.push("*" + rot + "*" + val);
+        } else {
+          linhas.push(txt);
+        }
+      }
+    } else if (el.nodeType === 3) {
+      var t = el.nodeValue.trim();
+      if (t) linhas.push(t);
+    }
+  }
+  return linhas.join(NL).trim();
+}
+
 function limparResenha() {
   var ids = new Array("r-sec", "r-inst", "r-bat", "r-cia", "r-vtr", "r-cmte", "r-mot", "r-seg1", "r-seg2", "r-seg3", "r-nat", "r-dt", "r-hr", "r-local", "r-area", "r-bopm", "r-bopc", "r-dp", "r-del", "r-apr", "r-hist");
   for (var i = 0; i < ids.length; i++) {
     var el = $(ids[i]);
     if (el) el.value = "";
   }
-  resenhaEnvolvidos = new Array({ tipo: "Indiciado", nome: "", rg: "", artigo: "" });
-  renderizarEnvolvidosResenha();
+  resenhaIndiciados = new Array({ nome: "", rg: "", artigo: "" });
+  resenhaSindicados = new Array({ nome: "", rg: "", artigo: "" });
+  renderizarIndiciadosResenha();
+  renderizarSindicadosResenha();
   atualizarResenha();
 }
 
 function enviarResenhaWpp() {
-  var res = gerarDadosResenha();
-  if (!res.wpp) return alert("Preencha os dados da resenha primeiro.");
-  enviarWpp(res.wpp);
+  var txt = obterTextoEditadoResenha(true);
+  if (!txt) return alert("Preencha os dados da resenha primeiro.");
+  enviarWpp(txt);
 }
 
 function copiarResenha() {
-  var res = gerarDadosResenha();
-  if (!res.puro) return alert("Preencha os dados da resenha primeiro.");
-  navigator.clipboard.writeText(res.puro);
+  var txt = obterTextoEditadoResenha(false);
+  if (!txt) return alert("Preencha os dados da resenha primeiro.");
+  navigator.clipboard.writeText(txt);
   alert("Resenha copiada!");
 }
 
 function salvarResenhaApp() {
-  var res = gerarDadosResenha();
-  if (!res.puro) return alert("Preencha os dados da resenha primeiro.");
+  var txt = obterTextoEditadoResenha(false);
+  if (!txt) return alert("Preencha os dados da resenha primeiro.");
   var nat = $("r-nat").value.trim() || "Ocorrência";
   var dt = getToday();
   var list = JSON.parse(sGet("qru_saved") || "[]");
-  list.unshift({ data: "Resenha (" + nat + ") - " + dt, text: res.puro });
+  list.unshift({ data: "Resenha (" + nat + ") - " + dt, text: txt });
   sSet("qru_saved", JSON.stringify(list));
   updateCount();
   alert("Resenha salva nos relatórios do app!");
 }
 
 async function exportarResenhaTxt() {
-  var res = gerarDadosResenha();
-  if (!res.puro) return alert("Preencha os dados da resenha primeiro.");
+  var txt = obterTextoEditadoResenha(false);
+  if (!txt) return alert("Preencha os dados da resenha primeiro.");
   var bopm = ($("r-bopm").value.trim() || getToday()).replace(/[^a-zA-Z0-9_-]/g, "_");
   var nomeArq = "Resenha_" + bopm + ".txt";
-  var caminho = await salvarNaPastaAndroid(nomeArq, res.puro, false);
+  var caminho = await salvarNaPastaAndroid(nomeArq, txt, false);
   if (caminho) {
     alert("Resenha salva em:\n" + caminho);
   } else {
-    var blob = new Blob(new Array(res.puro), { type: "text/plain;charset=utf-8" }), a = document.createElement("a");
+    var blob = new Blob(new Array(txt), { type: "text/plain;charset=utf-8" }), a = document.createElement("a");
     a.href = URL.createObjectURL(blob); a.download = nomeArq; a.click();
   }
 }
+function formatarCampoMilitarMdip(idCampo) {
+  var el = $(idCampo);
+  if (!el || !el.value.trim()) return;
+  el.value = formatarTextoMilitar(el.value);
+  atualizarMdip();
+}
 
+function formatarCiaMdip() {
+  var el = $("m-cia");
+  if (!el || !el.value.trim()) return;
+  var v = el.value.trim();
+  var up = v.toUpperCase();
+  if (up === "FT") el.value = "Força Tática";
+  else if (up === "CANIL") el.value = "Canil";
+  else if (up === "CAVALARIA") el.value = "Cavalaria";
+  else if (up === "ROCAM") el.value = "ROCAM";
+  else if (isNum(v)) el.value = v + "ª Cia";
+  else el.value = formatarTextoMilitar(v);
+  atualizarMdip();
+}
+
+function formatarVtrCampo(idCampo) {
+  var el = $(idCampo);
+  if (!el || !el.value.trim()) return;
+  el.value = formatVtrTexto(el.value);
+}
+
+function formatarVtrMdip() {
+  formatarVtrCampo("m-vtr");
+  atualizarMdip();
+}
+
+function formatarPolicialMdip(idCampo) {
+  var el = $(idCampo);
+  if (!el || !el.value.trim()) return;
+  el.value = formatRankAndName(el.value);
+  addEquipe(el.value);
+  atualizarMdip();
+}
+
+function formatarDpMdip() {
+  var el = $("m-dp");
+  if (!el || !el.value.trim()) return;
+  el.value = formatarDpTexto(el.value);
+  atualizarMdip();
+}
+
+function adicionarFeridoMdip() {
+  mdipFeridos.push({ naoIdentificado: false, nome: "", rg: "", mae: "", criminal: "", obs: "" });
+  renderizarFeridosMdip();
+  atualizarMdip();
+}
+
+function removerFeridoMdip(idx) {
+  mdipFeridos.splice(idx, 1);
+  renderizarFeridosMdip();
+  atualizarMdip();
+}
+
+function alternarNaoIdentificadoMdip(idx) {
+  if (mdipFeridos[idx]) {
+    mdipFeridos[idx].naoIdentificado = !mdipFeridos[idx].naoIdentificado;
+    renderizarFeridosMdip();
+    atualizarMdip();
+  }
+}
+
+function onFeridoMdipInput(idx, campo, valor) {
+  if (mdipFeridos[idx]) {
+    mdipFeridos[idx][campo] = valor;
+    atualizarMdip();
+  }
+}
+
+function onFeridoMdipRgBlur(idx, inputEl) {
+  if (mdipFeridos[idx]) {
+    var fmt = formatarRgTexto(inputEl.value);
+    inputEl.value = fmt;
+    mdipFeridos[idx].rg = fmt;
+    atualizarMdip();
+  }
+}
+
+function renderizarFeridosMdip() {
+  var box = $("m-feridos-box");
+  if (!box) return;
+  var html = "";
+  for (var i = 0; i < mdipFeridos.length; i++) {
+    var f = mdipFeridos[i];
+    var nomeEsc = (f.nome || "").replace(/"/g, "&quot;");
+    var rgEsc = (f.rg || "").replace(/"/g, "&quot;");
+    var maeEsc = (f.mae || "").replace(/"/g, "&quot;");
+    var crimEsc = (f.criminal || "").replace(/"/g, "&quot;");
+    var obsEsc = (f.obs || "").replace(/"/g, "&quot;");
+    var btnCor = f.naoIdentificado ? "#eab308" : "#475569";
+    var btnTxtCor = f.naoIdentificado ? "#0f172a" : "#ffffff";
+
+    html += '<div class="env-box">' +
+      '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">' +
+        '<strong style="font-size:13px; color:#eab308;">Identificação do Ferido ' + (mdipFeridos.length > 1 ? (i + 1) : "") + '</strong>' +
+        '<div style="display:flex; gap:6px;">' +
+          '<button type="button" class="btn-small" style="background:' + btnCor + ';color:' + btnTxtCor + ';border:none;padding:5px 9px;font-weight:bold;" onclick="alternarNaoIdentificadoMdip(' + i + ')">' + (f.naoIdentificado ? "Não Identificado (Ativo)" : "Não Identificado") + '</button>' +
+          '<button type="button" class="btn-small" style="background:#dc2626;border:none;padding:5px 9px;" onclick="removerFeridoMdip(' + i + ')">X</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="row" style="margin-bottom:6px;">' +
+        '<span class="dot"></span><span class="lbl">Nome:</span>' +
+        '<input type="text" value="' + nomeEsc + '" oninput="onFeridoMdipInput(' + i + ', \'nome\', this.value)">' +
+      '</div>' +
+      '<div class="row" style="margin-bottom:6px;">' +
+        '<span class="dot"></span><span class="lbl">RG:</span>' +
+        '<input type="text" value="' + rgEsc + '" placeholder="xx.xxx.xxx-x ou xx.xxx.xxx" oninput="onFeridoMdipInput(' + i + ', \'rg\', this.value)" onblur="onFeridoMdipRgBlur(' + i + ', this)">' +
+      '</div>' +
+      '<div class="row" style="margin-bottom:6px;">' +
+        '<span class="dot"></span><span class="lbl">Mãe:</span>' +
+        '<input type="text" value="' + maeEsc + '" oninput="onFeridoMdipInput(' + i + ', \'mae\', this.value)">' +
+      '</div>' +
+      '<div class="row" style="margin-bottom:6px;">' +
+        '<span class="dot"></span><span class="lbl">Criminal:</span>' +
+        '<input type="text" value="' + crimEsc + '" oninput="onFeridoMdipInput(' + i + ', \'criminal\', this.value)">' +
+      '</div>' +
+      '<div class="row" style="margin-bottom:0;">' +
+        '<span class="dot"></span><span class="lbl">Obs. (Caract./Vest.):</span>' +
+        '<input type="text" value="' + obsEsc + '" placeholder="Características físicas e vestimentas..." oninput="onFeridoMdipInput(' + i + ', \'obs\', this.value)">' +
+      '</div>' +
+    '</div>';
+  }
+  box.innerHTML = html;
+}
+function gerarDadosMdip() {
+  var html = '<div class="res-title">MORTE DECORRENTE DE INTERVENÇÃO POLICIAL</div>';
+  var txtWpp = "*MORTE DECORRENTE DE INTERVENÇÃO POLICIAL*" + NL + NL;
+  var txtPuro = "MORTE DECORRENTE DE INTERVENÇÃO POLICIAL" + NL + NL;
+
+  function addCampo(rotulo, val) {
+    if (!val) return;
+    html += '<div class="res-line"><b>' + rotulo + ':</b> ' + val + '</div>';
+    txtWpp += "*" + rotulo + ":* " + val + NL;
+    txtPuro += rotulo + ": " + val + NL;
+  }
+
+  function addEspaco() {
+    html += '<div class="res-gap"></div>';
+    txtWpp += NL;
+    txtPuro += NL;
+  }
+
+  var dt = $("m-data").value.trim();
+  var qtr = $("m-qtr").value.trim();
+  var area = $("m-area").value.trim();
+  var cia = $("m-cia").value.trim();
+  var qth = $("m-qth").value.trim();
+  var correg = $("m-correg").value.trim();
+
+  var temBloco1 = (dt || qtr || area || cia || qth || correg);
+  if (temBloco1) {
+    addCampo("Data", dt);
+    addCampo("QTR", qtr);
+    addCampo("Área", area);
+    addCampo("Cia", cia);
+    addCampo("QTH dos fatos", qth);
+    addCampo("QTR acionamento Correg/Atendente", correg);
+  }
+
+  var vtr = $("m-vtr").value.trim();
+  if (vtr) {
+    if (temBloco1) addEspaco();
+    addCampo("Viatura", vtr);
+  }
+
+  var equipeSlots = new Array(
+    { lbl: "Cmte Equipe", p: "m-cmt", a: "m-cmt-arma", d: "m-cmt-disp", o: "m-cmt-ocor" },
+    { lbl: "Motorista", p: "m-mot", a: "m-mot-arma", d: "m-mot-disp", o: "m-mot-ocor" },
+    { lbl: "3º Homem", p: "m-h3", a: "m-h3-arma", d: "m-h3-disp", o: "m-h3-ocor" },
+    { lbl: "4º Homem", p: "m-h4", a: "m-h4-arma", d: "m-h4-disp", o: "m-h4-ocor" },
+    { lbl: "5º Homem", p: "m-h5", a: "m-h5-arma", d: "m-h5-disp", o: "m-h5-ocor" }
+  );
+
+  var temAlgumPolicial = false;
+  for (var i = 0; i < equipeSlots.length; i++) {
+    var sl = equipeSlots[i];
+    var vp = $(sl.p).value.trim();
+    var va = $(sl.a).value.trim();
+    var vd = $(sl.d).value.trim();
+    var vo = $(sl.o).value.trim();
+    if (vp || va || vd || vo) {
+      if (temBloco1 || vtr || temAlgumPolicial) addEspaco();
+      temAlgumPolicial = true;
+      addCampo(sl.lbl, vp);
+      addCampo("Arma", va);
+      addCampo("Qtde Disparos", vd);
+      addCampo("Qtde Ocorrências", vo);
+    }
+  }
+
+  var feridosValidos = new Array();
+  for (var fIdx = 0; fIdx < mdipFeridos.length; fIdx++) {
+    var fer = mdipFeridos[fIdx];
+    if (fer.naoIdentificado || (fer.nome || "").trim() || (fer.rg || "").trim() || (fer.mae || "").trim() || (fer.criminal || "").trim() || (fer.obs || "").trim()) {
+      feridosValidos.push(fer);
+    }
+  }
+
+  if (feridosValidos.length > 0) {
+    for (var k = 0; k < feridosValidos.length; k++) {
+      if (temBloco1 || vtr || temAlgumPolicial || k > 0) addEspaco();
+      var curF = feridosValidos[k];
+      var rotFerido = feridosValidos.length > 1 ? ("Identificação do ferido " + (k + 1)) : "Identificação do ferido";
+      if (curF.naoIdentificado) {
+        addCampo(rotFerido, "Não identificado");
+      } else if (feridosValidos.length > 1) {
+        addCampo(rotFerido, "Identificado");
+      }
+      if ((curF.nome || "").trim()) addCampo("Nome", curF.nome.trim());
+      if ((curF.rg || "").trim()) addCampo("RG", formatarRgTexto(curF.rg));
+      if ((curF.mae || "").trim()) addCampo("Mãe", curF.mae.trim());
+      if ((curF.criminal || "").trim()) addCampo("Criminal", curF.criminal.trim());
+      if ((curF.obs || "").trim()) addCampo("Observação (Características/Vestimenta)", curF.obs.trim());
+    }
+  }
+
+  var dp = $("m-dp").value.trim();
+  var del = $("m-del").value.trim();
+  var qtrCiencia = $("m-qtr-ciencia").value.trim();
+  var bopm = $("m-bopm").value.trim();
+  var bopc = $("m-bopc").value.trim();
+  var temBlocoPolJud = (dp || del || qtrCiencia || bopm || bopc);
+  if (temBlocoPolJud) {
+    if (temBloco1 || vtr || temAlgumPolicial || feridosValidos.length > 0) addEspaco();
+    addCampo("DP", dp);
+    addCampo("Delegado", del);
+    addCampo("QTR Ciência", qtrCiencia);
+    addCampo("BOPM", bopm);
+    addCampo("BOPC", bopc);
+  }
+
+  var qtrRede = $("m-qtr-rede").value.trim();
+  var vtrsLocal = $("m-vtrs-local").value.trim();
+  var vtrIc = $("m-vtr-ic").value.trim();
+  var perito = $("m-perito").value.trim();
+  var qtrChegada = $("m-qtr-chegada").value.trim();
+  var aprRaw = $("m-apr").value.trim();
+  var itensApr = aprRaw ? separarItensApreensoes(aprRaw) : new Array();
+  var temBlocoApoio = (qtrRede || vtrsLocal || vtrIc || perito || qtrChegada || itensApr.length > 0);
+  if (temBlocoApoio) {
+    if (temBloco1 || vtr || temAlgumPolicial || feridosValidos.length > 0 || temBlocoPolJud) addEspaco();
+    addCampo("QTR solicitação de resgate na rede", qtrRede);
+    addCampo("Viaturas que compareceram pelo local", vtrsLocal);
+    addCampo("Viatura IC", vtrIc);
+    addCampo("Perito", perito);
+    addCampo("QTR chegada", qtrChegada);
+    if (itensApr.length > 0) {
+      html += '<div class="res-line"><b>Objetos apreendidos:</b></div>';
+      txtWpp += "*Objetos apreendidos:*" + NL;
+      txtPuro += "Objetos apreendidos:" + NL;
+      for (var aIdx = 0; aIdx < itensApr.length; aIdx++) {
+        html += '<div class="res-line">• ' + itensApr[aIdx] + '</div>';
+        txtWpp += "• " + itensApr[aIdx] + NL;
+        txtPuro += "• " + itensApr[aIdx] + NL;
+      }
+    }
+  }
+
+  var resgate = $("m-resgate").value.trim();
+  var qtrLocal = $("m-qtr-local").value.trim();
+  var qtrSaida = $("m-qtr-saida").value.trim();
+  var qtrPs = $("m-qtr-ps").value.trim();
+  var ps = $("m-ps").value.trim();
+  var medico = $("m-medico").value.trim();
+  var vtrEscolta = $("m-vtr-escolta").value.trim();
+  var temBlocoResgate = (resgate || qtrLocal || qtrSaida || qtrPs || ps || medico || vtrEscolta);
+  if (temBlocoResgate) {
+    if (temBloco1 || vtr || temAlgumPolicial || feridosValidos.length > 0 || temBlocoPolJud || temBlocoApoio) addEspaco();
+    addCampo("Resgate", resgate);
+    addCampo("QTR no local", qtrLocal);
+    addCampo("QTR de saída", qtrSaida);
+    addCampo("QTR no PS", qtrPs);
+    addCampo("PS", ps);
+    addCampo("Médico + CRM", medico);
+    addCampo("VTR Escolta", vtrEscolta);
+  }
+
+  return { html: html, wpp: txtWpp.trim(), puro: txtPuro.trim() };
+}
+
+function atualizarMdip() {
+  var box = $("mdip-preview-box");
+  if (!box) return;
+  var res = gerarDadosMdip();
+  box.innerHTML = res.html;
+}
+
+function obterTextoEditadoMdip(modoWpp) {
+  var box = $("mdip-preview-box");
+  if (!box) return "";
+  var linhas = new Array();
+  var filhos = box.childNodes;
+  for (var i = 0; i < filhos.length; i++) {
+    var el = filhos[i];
+    if (el.nodeType === 1) {
+      if (el.className === "res-gap") {
+        linhas.push("");
+      } else {
+        var txt = (el.innerText || el.textContent || "").trim();
+        if (modoWpp && (el.className === "res-center" || el.className === "res-title")) {
+          linhas.push("*" + txt + "*");
+        } else if (modoWpp && txt.indexOf(":") > -1 && el.querySelector("b")) {
+          var idxDoisPontos = txt.indexOf(":");
+          var rot = txt.slice(0, idxDoisPontos + 1);
+          var val = txt.slice(idxDoisPontos + 1);
+          linhas.push("*" + rot + "*" + val);
+        } else {
+          linhas.push(txt);
+        }
+      }
+    } else if (el.nodeType === 3) {
+      var t = el.nodeValue.trim();
+      if (t) linhas.push(t);
+    }
+  }
+  return linhas.join(NL).trim();
+}
+
+function limparMdip() {
+  var ids = new Array("m-data", "m-qtr", "m-area", "m-cia", "m-qth", "m-correg", "m-vtr", "m-cmt", "m-cmt-arma", "m-cmt-disp", "m-cmt-ocor", "m-mot", "m-mot-arma", "m-mot-disp", "m-mot-ocor", "m-h3", "m-h3-arma", "m-h3-disp", "m-h3-ocor", "m-h4", "m-h4-arma", "m-h4-disp", "m-h4-ocor", "m-h5", "m-h5-arma", "m-h5-disp", "m-h5-ocor", "m-dp", "m-del", "m-qtr-ciencia", "m-bopm", "m-bopc", "m-qtr-rede", "m-vtrs-local", "m-vtr-ic", "m-perito", "m-qtr-chegada", "m-apr", "m-resgate", "m-qtr-local", "m-qtr-saida", "m-qtr-ps", "m-ps", "m-medico", "m-vtr-escolta");
+  for (var i = 0; i < ids.length; i++) {
+    var el = $(ids[i]);
+    if (el) el.value = "";
+  }
+  mdipFeridos = new Array({ naoIdentificado: false, nome: "", rg: "", mae: "", criminal: "", obs: "" });
+  renderizarFeridosMdip();
+  atualizarMdip();
+}
+
+function enviarMdipWpp() {
+  var txt = obterTextoEditadoMdip(true);
+  if (!txt) return alert("Preencha os dados do MDIP primeiro.");
+  enviarWpp(txt);
+}
+
+function copiarMdip() {
+  var txt = obterTextoEditadoMdip(false);
+  if (!txt) return alert("Preencha os dados do MDIP primeiro.");
+  navigator.clipboard.writeText(txt);
+  alert("MDIP copiado!");
+}
+
+function salvarMdipApp() {
+  var txt = obterTextoEditadoMdip(false);
+  if (!txt) return alert("Preencha os dados do MDIP primeiro.");
+  var dt = $("m-data").value.trim() || getToday();
+  var list = JSON.parse(sGet("qru_saved") || "[]");
+  list.unshift({ data: "MDIP - " + dt, text: txt });
+  sSet("qru_saved", JSON.stringify(list));
+  updateCount();
+  alert("MDIP salvo nos relatórios do app!");
+}
+
+async function exportarMdipTxt() {
+  var txt = obterTextoEditadoMdip(false);
+  if (!txt) return alert("Preencha os dados do MDIP primeiro.");
+  var bopm = ($("m-bopm").value.trim() || getToday()).replace(/[^a-zA-Z0-9_-]/g, "_");
+  var nomeArq = "MDIP_" + bopm + ".txt";
+  var caminho = await salvarNaPastaAndroid(nomeArq, txt, false);
+  if (caminho) {
+    alert("MDIP salvo em:\n" + caminho);
+  } else {
+    var blob = new Blob(new Array(txt), { type: "text/plain;charset=utf-8" }), a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = nomeArq; a.click();
+  }
+}
 function saveAll() {
   sSet("qru_draft", JSON.stringify({
     doc: $("f-doc").value, uni: $("f-uni").value, outUni: $("out-uni").value, data: $("f-data").value, hora: $("f-hora").value,
