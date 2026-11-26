@@ -53,6 +53,19 @@ function abrirSalvos() { $("saved-detail").style.display = "none"; renderSaved()
 function abrirResenha() { renderizarIndiciadosResenha(); renderizarSindicadosResenha(); atualizarResenha(); mostrarTela("resenha-screen"); }
 function abrirMdip() { renderizarFeridosMdip(); atualizarMdip(); mostrarTela("mdip-screen"); }
 
+function registrarTrabalhoSalvo(titulo, texto, imagemBase64) {
+  if (!texto && !imagemBase64) return;
+  var list = JSON.parse(sGet("qru_saved") || "[]");
+  if (list.length > 0 && list.data === titulo && list.text === texto && (list.img || "") === (imagemBase64 || "")) {
+    return;
+  }
+  var item = { data: titulo, text: texto || "" };
+  if (imagemBase64) item.img = imagemBase64;
+  list.unshift(item);
+  sSet("qru_saved", JSON.stringify(list));
+  updateCount();
+}
+
 function atualizarFundo() {
   var home = $("home-screen");
   var btnRm = $("btn-rm-bg");
@@ -82,15 +95,112 @@ function removeBg() {
   atualizarFundo();
 }
 
+function normalizarCidadesEAcentos(txt) {
+  if (!txt) return "";
+  var mapa = new Array(
+    { re: /\bsao vicente\b/gi, rep: "São Vicente" },
+    { re: /\bsantos\b/gi, rep: "Santos" },
+    { re: /\bpedro de toledo\b/gi, rep: "Pedro de Toledo" },
+    { re: /\bguaruja\b/gi, rep: "Guarujá" },
+    { re: /\bcubatao\b/gi, rep: "Cubatão" },
+    { re: /\bpraia grande\b/gi, rep: "Praia Grande" },
+    { re: /\bmongagua\b/gi, rep: "Mongaguá" },
+    { re: /\bitanhaem\b/gi, rep: "Itanhaém" },
+    { re: /\bperuibe\b/gi, rep: "Peruíbe" },
+    { re: /\bbertioga\b/gi, rep: "Bertioga" },
+    { re: /\bsao paulo\b/gi, rep: "São Paulo" },
+    { re: /\bsao sebastiao\b/gi, rep: "São Sebastião" },
+    { re: /\bilhabela\b/gi, rep: "Ilhabela" },
+    { re: /\bcaraguatatuba\b/gi, rep: "Caraguatatuba" },
+    { re: /\bubatuba\b/gi, rep: "Ubatuba" },
+    { re: /\bregistro\b/gi, rep: "Registro" },
+    { re: /\bjacupiranga\b/gi, rep: "Jacupiranga" },
+    { re: /\bcajati\b/gi, rep: "Cajati" },
+    { re: /\bjuquia\b/gi, rep: "Juquiá" },
+    { re: /\bmiracatu\b/gi, rep: "Miracatu" },
+    { re: /\bitariri\b/gi, rep: "Itariri" },
+    { re: /\biguape\b/gi, rep: "Iguape" },
+    { re: /\bilha comprida\b/gi, rep: "Ilha Comprida" },
+    { re: /\bcananeia\b/gi, rep: "Cananéia" },
+    { re: /\bcatalao\b/gi, rep: "Catalão" },
+    { re: /\bsao\b/gi, rep: "São" },
+    { re: /\bjoao\b/gi, rep: "João" },
+    { re: /\bjose\b/gi, rep: "José" },
+    { re: /\bantonio\b/gi, rep: "Antônio" }
+  );
+  var res = txt;
+  for (var i = 0; i < mapa.length; i++) {
+    res = res.replace(mapa[i].re, mapa[i].rep);
+  }
+  return res;
+}
+
 function titleCase(s) {
   if (!s) return "";
   var minusculas = new Array("de", "da", "do", "das", "dos", "e", "em", "na", "no", "nas", "nos");
-  return s.trim().toLowerCase().split(" ").filter(function(x) { return x !== ""; }).map(function(w, idx) {
+  var base = s.trim().toLowerCase().split(" ").filter(function(x) { return x !== ""; }).map(function(w, idx) {
+    if (w.indexOf("/") > -1) {
+      var p = w.split("/");
+      var left = p.charAt(0).toUpperCase() + p.slice(1);
+      var right = p.length <= 2 ? p.toUpperCase() : (p.charAt(0).toUpperCase() + p.slice(1));
+      return left + "/" + right;
+    }
     if (idx > 0 && minusculas.indexOf(w) > -1) return w;
     return w.charAt(0).toUpperCase() + w.slice(1);
   }).join(" ");
+  return normalizarCidadesEAcentos(base);
 }
 
+function formatarEnderecoCompleto(raw) {
+  var v = (raw || "").trim();
+  if (!v) return "";
+  var limpo = v.replace(/,/g, " ").replace(/\s+-\s+/g, " ").replace(/\s+/g, " ").trim();
+  var m = limpo.match(/^(.+?)\s+([0-9]+[a-zA-Z0-9\-\/]*|s\/n)\s+(.+)$/i);
+  if (m) {
+    var logr = titleCase(m);
+    var num = m.toUpperCase() === "S/N" ? "s/n" : m.toUpperCase();
+    var resto = m.trim();
+    var ufMatch = resto.match(/^(.*?)[\s\/\-]+(sp|rj|mg|pr|sc|rs|es|ba|go|df|ms|mt)$/i);
+    var uf = "";
+    if (ufMatch) {
+      resto = ufMatch.trim();
+      uf = "/" + ufMatch.toUpperCase();
+    }
+    var palavrasResto = resto.split(" ").filter(function(x) { return x !== ""; });
+    if (palavrasResto.length >= 2) {
+      var cidConhecidas2 = new Array("sao vicente", "são vicente", "praia grande", "ilha comprida", "sao paulo", "são paulo", "sao sebastiao", "são sebastião");
+      var cidConhecidas3 = new Array("pedro de toledo");
+      var lowerResto = resto.toLowerCase();
+      var cidade = "", bairro = "";
+      for (var c3 = 0; c3 < cidConhecidas3.length; c3++) {
+        if (lowerResto.endsWith(cidConhecidas3[c3])) {
+          cidade = titleCase(cidConhecidas3[c3]);
+          bairro = titleCase(resto.slice(0, resto.length - cidConhecidas3[c3].length).trim());
+          break;
+        }
+      }
+      if (!cidade) {
+        for (var c2 = 0; c2 < cidConhecidas2.length; c2++) {
+          if (lowerResto.endsWith(cidConhecidas2[c2])) {
+            cidade = titleCase(cidConhecidas2[c2]);
+            bairro = titleCase(resto.slice(0, resto.length - cidConhecidas2[c2].length).trim());
+            break;
+          }
+        }
+      }
+      if (!cidade) {
+        cidade = titleCase(palavrasResto.pop());
+        bairro = titleCase(palavrasResto.join(" "));
+      }
+      if (bairro && cidade) {
+        return logr + ", " + num + " - " + bairro + " - " + cidade + uf;
+      }
+      return logr + ", " + num + " - " + (bairro || cidade) + uf;
+    }
+    return logr + ", " + num + " - " + titleCase(resto) + uf;
+  }
+  return normalizarCidadesEAcentos(titleCase(v));
+}
 function formatarTextoMilitar(raw) {
   var txt = (raw || "").trim();
   if (!txt) return "";
@@ -104,7 +214,27 @@ function formatarTextoMilitar(raw) {
   txt = txt.replace(/\b([0-9]+)\s*[°º]?\s*bpchq\b/gi, "$1º BPChq");
   txt = txt.replace(/\b([0-9]+)\s*[°º]?\s*dp\b/gi, "$1º DP");
   txt = txt.replace(/\bdp\b/gi, "DP");
-  return txt;
+  txt = txt.replace(/\bcpj\b/gi, "CPJ");
+  txt = txt.replace(/\b([a-zA-Z])-?([0-9]{4,5})\b/g, function(all, l, n) {
+    return l.toUpperCase() + "-" + n;
+  });
+  txt = txt.replace(/\b()\s*[°º]?\s*(sgt|ten|sargento|tenente)\s*(?:pm\s+)?([a-zA-ZÀ-ÿ]+)/gi, function(all, n, g, nome) {
+    return n + "° " + (g.toLowerCase().indexOf("ten") === 0 ? "Ten" : "Sgt") + " PM " + titleCase(nome);
+  });
+  txt = txt.replace(/\b(sd|soldado|cb|cabo|sgt|sargento|ten|tenente|cap|capit[aã]o|maj|major|cel|coronel|subten|asp)\s*(?:pm\s+)?([a-zA-ZÀ-ÿ]+)/gi, function(all, g, nome) {
+    var gl = g.toLowerCase().replace(".", "");
+    var gr = "Sd";
+    if (gl.indexOf("cb") === 0 || gl.indexOf("cab") === 0) gr = "Cb";
+    else if (gl.indexOf("sgt") === 0 || gl.indexOf("sar") === 0) gr = "Sgt";
+    else if (gl.indexOf("ten") === 0) gr = "Ten";
+    else if (gl.indexOf("cap") === 0) gr = "Cap";
+    else if (gl.indexOf("maj") === 0) gr = "Maj";
+    else if (gl.indexOf("cel") === 0 || gl.indexOf("cor") === 0) gr = "Cel";
+    else if (gl.indexOf("sub") === 0) gr = "Subten";
+    else if (gl.indexOf("asp") === 0) gr = "Asp";
+    return gr + " PM " + titleCase(nome);
+  });
+  return normalizarCidadesEAcentos(txt);
 }
 
 function resolverNomeBatalhao(raw) {
@@ -150,9 +280,9 @@ function formatarSiglaBatalhaoCurta(raw) {
   var up = v.toUpperCase();
   var m = up.match(/^([0-9]+)\s*[°º]?\s*(BAEP|BPMI|BPM\/I|I|BPMM|BPM\/M|M|BPCHQ|CAEP|PAEP)(.*)$/);
   if (m) {
-    var num = m[1];
-    var tipo = m[2];
-    var resto = m[3] ? titleCase(m[3].trim()) : "";
+    var num = m;
+    var tipo = m;
+    var resto = m ? titleCase(m.trim()) : "";
     if (tipo === "BPMI" || tipo === "I") tipo = "BPM/I";
     if (tipo === "BPMM" || tipo === "M") tipo = "BPM/M";
     if (tipo === "BPCHQ") tipo = "BPChq";
@@ -169,11 +299,11 @@ function formatarDpTexto(raw) {
   var partes = txt.split(" ");
   for (var i = 0; i < partes.length; i++) {
     var p = partes[i];
-    if (p !== "DP" && p.indexOf("º") === -1 && p.indexOf("ª") === -1 && p.indexOf("/") === -1 && p !== "BPM/I" && p !== "BPM/M" && p !== "BAEP") {
+    if (p !== "DP" && p !== "CPJ" && p.indexOf("º") === -1 && p.indexOf("ª") === -1 && p.indexOf("/") === -1 && p !== "BPM/I" && p !== "BPM/M" && p !== "BAEP") {
       partes[i] = titleCase(p);
     }
   }
-  return partes.join(" ");
+  return normalizarCidadesEAcentos(partes.join(" "));
 }
 function onUnitChange() {
   var res = resolverNomeBatalhao($("f-uni").value);
@@ -217,11 +347,26 @@ function formatAllEquipe() {
   }
 }
 
+function formatarHoraUnica(raw) {
+  var v = (raw || "").trim();
+  if (!v) return "";
+  if (/^[0-9]{4}$/.test(v)) return v.slice(0, 2) + ":" + v.slice(2, 4);
+  if (/^[0-9]{3}$/.test(v)) return "0" + v.slice(0, 1) + ":" + v.slice(1, 3);
+  if (/^[0-9]{1,2}$/.test(v)) return two(v) + ":00";
+  if (/^[0-9]{1,2}:[0-9]{2}$/.test(v)) {
+    var p = v.split(":");
+    return two(p) + ":" + p;
+  }
+  return v;
+}
+
 function extractTimes(str) {
   var parts = str.split(" "), found = new Array();
   for (var i = 0; i < parts.length; i++) {
     var p = parts.slice(i, i + 1).join("").trim();
     if (isNum(p) && p.length <= 2) found.push(two(p) + ":00");
+    else if (isNum(p) && p.length === 3) found.push("0" + p.slice(0, 1) + ":" + p.slice(1, 3));
+    else if (isNum(p) && p.length === 4) found.push(p.slice(0, 2) + ":" + p.slice(2, 4));
     else if (p.indexOf(":") > -1) {
       var hp = p.split(":");
       if (hp.length === 2 && isNum(hp.slice(0, 1).join("")) && isNum(hp.slice(1, 2).join(""))) {
@@ -407,7 +552,7 @@ function consultarBairroApi(lat, lon) {
     .catch(function() {
       var url2 = "https://komoot.io" + lon + "&lat=" + lat;
       return httpGetJson(url2).then(function(j2) {
-        var feat = j2 && j2.features && j2.features.length > 0 ? j2.features[0] : null;
+        var feat = j2 && j2.features && j2.features.length > 0 ? j2.features : null;
         var props = feat ? feat.properties : {};
         var b2 = props.district || props.suburb || props.neighbourhood || props.locality || props.name || "";
         var c2 = props.city || props.town || props.county || "";
@@ -607,13 +752,11 @@ async function abrirModalKmFin() {
     addItem("Das " + prevEnd + " às    - Pela base, preenchimento de RSO, desequipagem da viatura e encerramento do serviço.");
     var hoje = getToday();
     var textoFinal = $("txt-body").value;
-    var list = JSON.parse(sGet("qru_saved") || "[]");
-    list.unshift({ data: "Relatório - " + hoje, text: textoFinal });
-    sSet("qru_saved", JSON.stringify(list));
+    registrarTrabalhoSalvo("Relatório - " + hoje, textoFinal, "");
     sDel("qru_draft");
     var caminhoSalvo = await salvarNaPastaAndroid("Relatorio_" + hoje.split("/").join("-") + ".txt", textoFinal, false);
     limparCampos();
-    alert(caminhoSalvo ? "Relatório encerrado e salvo em:\n" + caminhoSalvo : "Relatório encerrado e salvo no app!");
+    alert(caminhoSalvo ? "Relatório encerrado e salvo em:\n" + caminhoSalvo : "Relatório encerrado e salvo em Trabalhos Salvos!");
     voltarInicio();
   } else {
     $("modal-kmi-info").textContent = "KM Inicial informado: " + ($("f-kmi").value.trim() || "não preenchido");
@@ -639,13 +782,11 @@ async function encerrarRelatorio() {
   var hCab = extractTimes($("f-hora").value), fimServ = hCab.length > 0 ? hCab.slice(-1).join("") : "   ";
   addItem("Das " + prevEnd + " às " + fimServ + " - Pela base, preenchimento de RSO, desequipagem da viatura e encerramento do serviço.");
   var textoFinal = getFullText();
-  var list = JSON.parse(sGet("qru_saved") || "[]");
-  list.unshift({ data: "Folha de QRU - " + dtCab, text: textoFinal });
-  sSet("qru_saved", JSON.stringify(list));
+  registrarTrabalhoSalvo("Folha de QRU - " + dtCab, textoFinal, "");
   sDel("qru_draft");
   var caminhoSalvo = await salvarNaPastaAndroid("Folha_de_QRU_" + dtCab.split("/").join("-") + ".txt", textoFinal, false);
   limparCampos();
-  alert(caminhoSalvo ? "Relatório encerrado e salvo em:\n" + caminhoSalvo : "Relatório encerrado e salvo no app!");
+  alert(caminhoSalvo ? "Relatório encerrado e salvo em:\n" + caminhoSalvo : "Relatório encerrado e salvo em Trabalhos Salvos!");
   voltarInicio();
 }
 function getFullText() {
@@ -672,11 +813,20 @@ async function enviarWpp(texto) {
   window.location.href = "https://whatsapp.com" + encodeURIComponent(texto);
 }
 
-function sendWhats() { enviarWpp(getFullText()); }
+function sendWhats() {
+  var txt = getFullText();
+  var dt = $("f-data").value.trim() || getToday();
+  var origem = isModoRelatorio() ? "Relatório" : "Folha de QRU";
+  registrarTrabalhoSalvo(origem + " - " + dt, txt, "");
+  enviarWpp(txt);
+}
 
 async function exportTxt() {
   var txt = getFullText();
-  var dt = ($("f-data").value.trim() || getToday()).split("/").join("-");
+  var dtCab = $("f-data").value.trim() || getToday();
+  var dt = dtCab.split("/").join("-");
+  var origem = isModoRelatorio() ? "Relatório" : "Folha de QRU";
+  registrarTrabalhoSalvo(origem + " - " + dtCab, txt, "");
   var nome = (isModoRelatorio() ? "Relatorio_" : "Folha_de_QRU_") + dt + ".txt";
   var caminhoSalvo = await salvarNaPastaAndroid(nome, txt, false);
   if (caminhoSalvo) {
@@ -758,6 +908,20 @@ function formatarCidadeQual() {
   }
 }
 
+function formatarLocalCampo(idCampo) {
+  var el = $(idCampo);
+  if (el && el.value.trim()) {
+    el.value = formatarEnderecoCompleto(el.value);
+  }
+}
+
+function formatarGeralCampo(idCampo) {
+  var el = $(idCampo);
+  if (el && el.value.trim()) {
+    el.value = formatarTextoMilitar(el.value);
+  }
+}
+
 function onFotoCapturada(e) {
   var f = e.target.files ? e.target.files.item(0) : null;
   if (!f) return;
@@ -775,7 +939,6 @@ function onFotoCapturada(e) {
   };
   r.readAsDataURL(f);
 }
-
 function retanguloArredondado(ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -817,6 +980,8 @@ function gerarPlacaQualificacao() {
   formatarDataQual("q-dtn");
   formatarDpQual();
   formatarCidadeQual();
+  formatarLocalCampo("q-local");
+  formatarGeralCampo("q-obs");
 
   var img = new Image();
   img.onload = function() {
@@ -923,6 +1088,14 @@ function gerarPlacaQualificacao() {
     $("qual-final-img").src = fotoQualFinalBase64;
     $("qual-result-box").style.display = "block";
     $("qual-result-box").scrollIntoView({ behavior: "smooth" });
+
+    var dtQual = $("q-data").value.trim() || getToday();
+    var nomeQual = $("q-nome").value.trim();
+    var resumoQual = (nomeQual ? "Nome: " + nomeQual + NL : "") +
+      ($("q-rg").value.trim() ? "RG: " + $("q-rg").value.trim() + NL : "") +
+      ($("q-artigo").value.trim() ? "Artigo: " + $("q-artigo").value.trim() + NL : "") +
+      ($("q-dp").value.trim() ? "DP: " + $("q-dp").value.trim() : "");
+    registrarTrabalhoSalvo("Foto e Qualificação - " + dtQual, resumoQual.trim(), fotoQualFinalBase64);
   };
   img.src = fotoQualBase64;
 }
@@ -1059,6 +1232,27 @@ function formatarDpResenha() {
   atualizarResenha();
 }
 
+function formatarHoraResenha() {
+  var el = $("r-hr");
+  if (!el || !el.value.trim()) return;
+  el.value = formatarHoraUnica(el.value);
+  atualizarResenha();
+}
+
+function formatarLocalResenha() {
+  var el = $("r-local");
+  if (!el || !el.value.trim()) return;
+  el.value = formatarEnderecoCompleto(el.value);
+  atualizarResenha();
+}
+
+function formatarGeralResenha(idCampo) {
+  var el = $(idCampo);
+  if (!el || !el.value.trim()) return;
+  el.value = formatarTextoMilitar(el.value);
+  atualizarResenha();
+}
+
 function adicionarIndiciado() {
   resenhaIndiciados.push({ nome: "", rg: "", artigo: "" });
   renderizarIndiciadosResenha();
@@ -1114,7 +1308,6 @@ function renderizarIndiciadosResenha() {
   }
   box.innerHTML = html;
 }
-
 function adicionarSindicado() {
   resenhaSindicados.push({ nome: "", rg: "", artigo: "" });
   renderizarSindicadosResenha();
@@ -1264,6 +1457,13 @@ function gerarDadosResenha() {
   var txtWpp = "";
   var txtPuro = "";
 
+  function addTopoIgual(val) {
+    if (!val) return;
+    html += '<div class="res-topo-igual">' + val + '</div>';
+    txtWpp += "*" + val + "*" + NL;
+    txtPuro += val + NL;
+  }
+
   function addTopo(val) {
     if (!val) return;
     html += '<div class="res-center">' + val + '</div>';
@@ -1284,9 +1484,12 @@ function gerarDadosResenha() {
     txtPuro += NL;
   }
 
-  addTopo(sec);
-  addTopo(inst);
-  addTopo(bat);
+  addTopoIgual(sec);
+  addTopoIgual(inst);
+  if (bat) {
+    if (sec || inst) addEspaco();
+    addTopo(bat);
+  }
 
   html += '<div class="res-title">RESENHA DE OCORRÊNCIA</div>';
   txtWpp += NL + "*RESENHA DE OCORRÊNCIA*" + NL + NL;
@@ -1414,7 +1617,7 @@ function obterTextoEditadoResenha(modoWpp) {
         linhas.push("");
       } else {
         var txt = (el.innerText || el.textContent || "").trim();
-        if (modoWpp && (el.className === "res-center" || el.className === "res-title")) {
+        if (modoWpp && (el.className === "res-center" || el.className === "res-topo-igual" || el.className === "res-title")) {
           linhas.push("*" + txt + "*");
         } else if (modoWpp && txt.indexOf(":") > -1 && el.querySelector("b")) {
           var idxDoisPontos = txt.indexOf(":");
@@ -1447,9 +1650,12 @@ function limparResenha() {
 }
 
 function enviarResenhaWpp() {
-  var txt = obterTextoEditadoResenha(true);
-  if (!txt) return alert("Preencha os dados da resenha primeiro.");
-  enviarWpp(txt);
+  var txtWpp = obterTextoEditadoResenha(true);
+  var txtPuro = obterTextoEditadoResenha(false);
+  if (!txtWpp) return alert("Preencha os dados da resenha primeiro.");
+  var dt = getToday();
+  registrarTrabalhoSalvo("Resenha de Ocorrência - " + dt, txtPuro, "");
+  enviarWpp(txtWpp);
 }
 
 function copiarResenha() {
@@ -1462,19 +1668,17 @@ function copiarResenha() {
 function salvarResenhaApp() {
   var txt = obterTextoEditadoResenha(false);
   if (!txt) return alert("Preencha os dados da resenha primeiro.");
-  var nat = $("r-nat").value.trim() || "Ocorrência";
   var dt = getToday();
-  var list = JSON.parse(sGet("qru_saved") || "[]");
-  list.unshift({ data: "Resenha (" + nat + ") - " + dt, text: txt });
-  sSet("qru_saved", JSON.stringify(list));
-  updateCount();
-  alert("Resenha salva nos relatórios do app!");
+  registrarTrabalhoSalvo("Resenha de Ocorrência - " + dt, txt, "");
+  alert("Resenha salva em Trabalhos Salvos!");
 }
 
 async function exportarResenhaTxt() {
   var txt = obterTextoEditadoResenha(false);
   if (!txt) return alert("Preencha os dados da resenha primeiro.");
-  var bopm = ($("r-bopm").value.trim() || getToday()).replace(/[^a-zA-Z0-9_-]/g, "_");
+  var dt = getToday();
+  registrarTrabalhoSalvo("Resenha de Ocorrência - " + dt, txt, "");
+  var bopm = ($("r-bopm").value.trim() || dt).replace(/[^a-zA-Z0-9_-]/g, "_");
   var nomeArq = "Resenha_" + bopm + ".txt";
   var caminho = await salvarNaPastaAndroid(nomeArq, txt, false);
   if (caminho) {
@@ -1488,6 +1692,47 @@ function formatarCampoMilitarMdip(idCampo) {
   var el = $(idCampo);
   if (!el || !el.value.trim()) return;
   el.value = formatarTextoMilitar(el.value);
+  atualizarMdip();
+}
+
+function formatarLocalMdip() {
+  var el = $("m-qth");
+  if (!el || !el.value.trim()) return;
+  el.value = formatarEnderecoCompleto(el.value);
+  atualizarMdip();
+}
+
+function formatarHoraMdip(idCampo) {
+  var el = $(idCampo);
+  if (!el || !el.value.trim()) return;
+  el.value = formatarHoraUnica(el.value);
+  atualizarMdip();
+}
+
+function formatarHoraTextoMdip(idCampo) {
+  var el = $(idCampo);
+  if (!el || !el.value.trim()) return;
+  var txt = el.value.trim();
+  txt = txt.replace(/\b([0-9]{2})([0-9]{2})\b/g, "$1:$2");
+  el.value = formatarTextoMilitar(txt);
+  atualizarMdip();
+}
+
+function formatarGeralMdip(idCampo) {
+  var el = $(idCampo);
+  if (!el || !el.value.trim()) return;
+  el.value = formatarTextoMilitar(el.value);
+  atualizarMdip();
+}
+
+function formatarListaVtrsMdip(idCampo) {
+  var el = $(idCampo);
+  if (!el || !el.value.trim()) return;
+  var partes = el.value.split(",");
+  for (var i = 0; i < partes.length; i++) {
+    partes[i] = formatarTextoMilitar(partes[i].trim());
+  }
+  el.value = partes.join(", ");
   atualizarMdip();
 }
 
@@ -1614,7 +1859,7 @@ function renderizarFeridosMdip() {
   box.innerHTML = html;
 }
 function gerarDadosMdip() {
-  var html = '<div class="res-title">MORTE DECORRENTE DE INTERVENÇÃO POLICIAL</div>';
+  var html = '<div class="mdip-title">MORTE DECORRENTE DE INTERVENÇÃO POLICIAL</div>';
   var txtWpp = "*MORTE DECORRENTE DE INTERVENÇÃO POLICIAL*" + NL + NL;
   var txtPuro = "MORTE DECORRENTE DE INTERVENÇÃO POLICIAL" + NL + NL;
 
@@ -1694,9 +1939,11 @@ function gerarDadosMdip() {
       var rotFerido = feridosValidos.length > 1 ? ("Identificação do ferido " + (k + 1)) : "Identificação do ferido";
       if (curF.naoIdentificado) {
         addCampo(rotFerido, "Não identificado");
-      } else if (feridosValidos.length > 1) {
+      } else {
         addCampo(rotFerido, "Identificado");
       }
+      var temDadosPessoa = ((curF.nome || "").trim() || (curF.rg || "").trim() || (curF.mae || "").trim() || (curF.criminal || "").trim() || (curF.obs || "").trim());
+      if (temDadosPessoa) addEspaco();
       if ((curF.nome || "").trim()) addCampo("Nome", curF.nome.trim());
       if ((curF.rg || "").trim()) addCampo("RG", formatarRgTexto(curF.rg));
       if ((curF.mae || "").trim()) addCampo("Mãe", curF.mae.trim());
@@ -1736,6 +1983,7 @@ function gerarDadosMdip() {
     addCampo("Perito", perito);
     addCampo("QTR chegada", qtrChegada);
     if (itensApr.length > 0) {
+      if (qtrRede || vtrsLocal || vtrIc || perito || qtrChegada) addEspaco();
       html += '<div class="res-line"><b>Objetos apreendidos:</b></div>';
       txtWpp += "*Objetos apreendidos:*" + NL;
       txtPuro += "Objetos apreendidos:" + NL;
@@ -1788,7 +2036,7 @@ function obterTextoEditadoMdip(modoWpp) {
         linhas.push("");
       } else {
         var txt = (el.innerText || el.textContent || "").trim();
-        if (modoWpp && (el.className === "res-center" || el.className === "res-title")) {
+        if (modoWpp && (el.className === "res-center" || el.className === "res-title" || el.className === "mdip-title")) {
           linhas.push("*" + txt + "*");
         } else if (modoWpp && txt.indexOf(":") > -1 && el.querySelector("b")) {
           var idxDoisPontos = txt.indexOf(":");
@@ -1819,9 +2067,12 @@ function limparMdip() {
 }
 
 function enviarMdipWpp() {
-  var txt = obterTextoEditadoMdip(true);
-  if (!txt) return alert("Preencha os dados do MDIP primeiro.");
-  enviarWpp(txt);
+  var txtWpp = obterTextoEditadoMdip(true);
+  var txtPuro = obterTextoEditadoMdip(false);
+  if (!txtWpp) return alert("Preencha os dados do MDIP primeiro.");
+  var dt = $("m-data").value.trim() || getToday();
+  registrarTrabalhoSalvo("MDIP - " + dt, txtPuro, "");
+  enviarWpp(txtWpp);
 }
 
 function copiarMdip() {
@@ -1835,17 +2086,16 @@ function salvarMdipApp() {
   var txt = obterTextoEditadoMdip(false);
   if (!txt) return alert("Preencha os dados do MDIP primeiro.");
   var dt = $("m-data").value.trim() || getToday();
-  var list = JSON.parse(sGet("qru_saved") || "[]");
-  list.unshift({ data: "MDIP - " + dt, text: txt });
-  sSet("qru_saved", JSON.stringify(list));
-  updateCount();
-  alert("MDIP salvo nos relatórios do app!");
+  registrarTrabalhoSalvo("MDIP - " + dt, txt, "");
+  alert("MDIP salvo em Trabalhos Salvos!");
 }
 
 async function exportarMdipTxt() {
   var txt = obterTextoEditadoMdip(false);
   if (!txt) return alert("Preencha os dados do MDIP primeiro.");
-  var bopm = ($("m-bopm").value.trim() || getToday()).replace(/[^a-zA-Z0-9_-]/g, "_");
+  var dt = $("m-data").value.trim() || getToday();
+  registrarTrabalhoSalvo("MDIP - " + dt, txt, "");
+  var bopm = ($("m-bopm").value.trim() || dt).replace(/[^a-zA-Z0-9_-]/g, "_");
   var nomeArq = "MDIP_" + bopm + ".txt";
   var caminho = await salvarNaPastaAndroid(nomeArq, txt, false);
   if (caminho) {
@@ -1878,18 +2128,59 @@ function updateCount() { $("cnt-saved").textContent = JSON.parse(sGet("qru_saved
 
 function renderSaved() {
   var list = JSON.parse(sGet("qru_saved") || "[]"), box = $("saved-box");
-  if (!list.length) { box.innerHTML = "<div class='card'>Nenhum relatório salvo.</div>"; return; }
+  if (!list.length) { box.innerHTML = "<div class='card'>Nenhum trabalho salvo.</div>"; return; }
   box.innerHTML = list.map(function(it, idx) {
-    return '<div class="sv-item"><span class="sv-dt" onclick="openSaved(' + idx + ')">' + it.data + '</span><button type="button" class="btn-small" onclick="delSaved(' + idx + ')">Excluir</button></div>';
+    return '<div class="sv-item">' +
+      '<span class="sv-dt" onclick="openSaved(' + idx + ')">' + it.data + '</span>' +
+      '<button type="button" class="btn-small" onclick="renameSaved(' + idx + ')">Renomear</button>' +
+      '<button type="button" class="btn-small" style="background:#dc2626;border:none;" onclick="delSaved(' + idx + ')">Excluir</button>' +
+    '</div>';
   }).join("");
+}
+
+function renameSaved(i) {
+  var list = JSON.parse(sGet("qru_saved") || "[]");
+  if (!list[i]) return;
+  var novo = prompt("Digite o novo título:", list[i].data);
+  if (novo !== null && novo.trim() !== "") {
+    list[i].data = novo.trim();
+    sSet("qru_saved", JSON.stringify(list));
+    renderSaved();
+  }
 }
 
 function openSaved(i) {
   var list = JSON.parse(sGet("qru_saved") || "[]"), item = list.slice(i, i + 1).pop();
   if (!item) return;
-  $("saved-full-txt").textContent = item.text; $("saved-detail").style.display = "block";
-  $("btn-sv-wpp").onclick = function() { enviarWpp($("saved-full-txt").textContent); };
-  $("btn-sv-cpy").onclick = function() { navigator.clipboard.writeText(item.text); alert("Copiado!"); };
+  var imgEl = $("saved-full-img");
+  if (item.img) {
+    imgEl.src = item.img;
+    imgEl.style.display = "block";
+  } else {
+    imgEl.src = "";
+    imgEl.style.display = "none";
+  }
+  $("saved-full-txt").textContent = item.text || "";
+  $("saved-detail").style.display = "block";
+  $("btn-sv-wpp").onclick = async function() {
+    if (item.img) {
+      var Fs = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem;
+      var Share = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share;
+      if (Fs && Share) {
+        try {
+          var base64Puro = item.img.split(",").pop();
+          var resFile = await Fs.writeFile({ path: "trabalho_salvo.jpg", data: base64Puro, directory: "CACHE" });
+          await Share.share({ title: item.data, text: item.text || "", url: resFile.uri, dialogTitle: "Enviar Trabalho Salvo" });
+          return;
+        } catch (e) {}
+      }
+    }
+    enviarWpp($("saved-full-txt").textContent);
+  };
+  $("btn-sv-cpy").onclick = function() {
+    navigator.clipboard.writeText(item.text || item.data);
+    alert("Copiado!");
+  };
 }
 
 function delSaved(i) { var list = JSON.parse(sGet("qru_saved") || "[]"); list.splice(i, 1); sSet("qru_saved", JSON.stringify(list)); renderSaved(); updateCount(); }
