@@ -1225,11 +1225,7 @@ function formatarBatResenha() {
   if (!el) return;
   var v = el.value.trim();
   if (!v) return;
-  if (v.toUpperCase() === "ROTA") {
-    el.value = "ROTA";
-  } else {
-    el.value = formatarSiglaBatalhaoCurta(v);
-  }
+  el.value = resolverNomeBatalhao(v);
   atualizarResenha();
 }
 
@@ -1529,13 +1525,14 @@ function gerarDadosResenha() {
     txtPuro += NL;
   }
 
-  addTopoIgual(sec);
+    addTopoIgual(sec);
   addTopoIgual(inst);
   if (bat) {
     if (sec || inst) addEspaco();
     addTopo(bat);
   }
 
+  if (sec || inst || bat) addEspaco();
   html += '<div class="res-title">RESENHA DE OCORRÊNCIA</div><div class="res-gap"></div>';
   txtWpp += NL + "*RESENHA DE OCORRÊNCIA*" + NL + NL;
   txtPuro += NL + "RESENHA DE OCORRÊNCIA" + NL + NL;
@@ -1650,6 +1647,12 @@ function atualizarResenha() {
   box.innerHTML = res.html;
 }
 
+function centralizarLinhaWpp(txt) {
+  var larguraRef = 38;
+  var pad = Math.max(0, Math.floor((larguraRef - txt.length) / 2));
+  return " ".repeat(pad) + "*" + txt + "*";
+}
+
 function obterTextoEditadoResenha(modoWpp) {
   var box = $("res-preview-box");
   if (!box) return "";
@@ -1659,11 +1662,11 @@ function obterTextoEditadoResenha(modoWpp) {
     var el = filhos[i];
     if (el.nodeType === 1) {
       if (el.className === "res-gap") {
-        linhas.push("");
+        linhas.push(modoWpp ? "\u200B" : "");
       } else {
         var txt = (el.innerText || el.textContent || "").trim();
         if (modoWpp && (el.className === "res-center" || el.className === "res-topo-igual" || el.className === "res-title")) {
-          linhas.push("*" + txt + "*");
+          linhas.push(centralizarLinhaWpp(txt));
         } else if (modoWpp && txt.indexOf(":") > -1 && el.querySelector("b")) {
           var idxDoisPontos = txt.indexOf(":");
           var rot = txt.slice(0, idxDoisPontos + 1);
