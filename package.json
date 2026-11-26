@@ -1,0 +1,16 @@
+{
+  "name": "folha-de-qru",
+  "version": "1.0.0",
+  "description": "Folha de QRU e Relatório de Patrulhamento",
+  "scripts": {
+    "build": "echo 'Pronto'"
+  },
+  "dependencies": {
+    "@capacitor-community/background-geolocation": "^1.2.15",
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/core": "^6.1.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.2"
+  }
+}

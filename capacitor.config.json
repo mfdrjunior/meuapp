@@ -1,0 +1,9 @@
+{
+  "appId": "br.gov.sp.pm.folhaqru",
+  "appName": "Folha de QRU",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}
