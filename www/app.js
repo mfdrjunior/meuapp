@@ -458,7 +458,7 @@ async function salvarNaPastaAndroid(nomeArquivo, conteudo, isBase64) {
     if (Fs.requestPermissions) {
       await Fs.requestPermissions().catch(function() {});
     }
-    var diretorios = new Array("DOCUMENTS", "EXTERNAL");
+    var diretorios = new Array("DOCUMENTS", "EXTERNAL", "DATA");
     for (var i = 0; i < diretorios.length; i++) {
       var dir = diretorios.slice(i, i + 1).join("");
       try {
@@ -466,11 +466,14 @@ async function salvarNaPastaAndroid(nomeArquivo, conteudo, isBase64) {
         var opts = { path: "FolhaQRU/" + nomeArquivo, data: conteudo, directory: dir };
         if (!isBase64) opts.encoding = "utf8";
         await Fs.writeFile(opts);
-        return dir === "DOCUMENTS" ? "Documentos/FolhaQRU/" + nomeArquivo : "Android/data/br.gov.sp.pm.folhaqru/files/FolhaQRU/" + nomeArquivo;
+        if (dir === "DOCUMENTS") return "Documentos/FolhaQRU/" + nomeArquivo;
+        if (dir === "EXTERNAL") return "Android/data/br.gov.sp.pm.folhaqru/files/FolhaQRU/" + nomeArquivo;
+        return "Pasta interna do App/FolhaQRU/" + nomeArquivo;
       } catch (errDir) {}
     }
     return false;
   } catch (e) {
+    alert("Erro ao salvar arquivo: " + (e.message || e));
     return false;
   }
 }
@@ -766,12 +769,9 @@ async function salvarFotoQualificacao() {
 
   var caminhoSalvo = await salvarNaPastaAndroid(nomeArq, base64Puro, true);
   if (caminhoSalvo) {
-    alert("Foto salva em:\n" + caminhoSalvo);
+    alert("Foto salva com sucesso em:\n" + caminhoSalvo);
   } else {
-    var a = document.createElement("a");
-    a.href = fotoQualFinalBase64;
-    a.download = nomeArq;
-    a.click();
+    alert("Não foi possível gravar diretamente na pasta do Android. Use o botão WhatsApp / Compartilhar para salvar na Galeria.");
   }
 }
 
@@ -779,6 +779,29 @@ async function compartilharQualificacao() {
   if (!fotoQualFinalBase64) return alert("Gere a foto com placa primeiro.");
   var nomeBase = ($("q-nome").value.trim() || "Qualificacao").replace(/[^a-zA-Z0-9_-]/g, "_");
   var nomeArq = nomeBase + ".jpg";
+  var base64Puro = fotoQualFinalBase64.split(",").pop();
+
+  var Fs = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem;
+  var Share = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share;
+
+  if (Fs && Share) {
+    try {
+      var resFile = await Fs.writeFile({
+        path: nomeArq,
+        data: base64Puro,
+        directory: "CACHE"
+      });
+      await Share.share({
+        title: "Qualificação - " + ($("q-nome").value.trim() || ""),
+        url: resFile.uri,
+        dialogTitle: "Enviar Foto de Qualificação"
+      });
+      return;
+    } catch (e) {
+      alert("Aviso ao compartilhar: " + (e.message || e));
+    }
+  }
+
   try {
     var res = await fetch(fotoQualFinalBase64);
     var blob = await res.blob();
@@ -790,9 +813,8 @@ async function compartilharQualificacao() {
       });
       return;
     }
-  } catch (e) {
-    if (e.name === "AbortError") return;
-  }
+  } catch (e) {}
+
   salvarFotoQualificacao();
 }
 
@@ -1171,6 +1193,17 @@ function delSaved(i) { var list = JSON.parse(sGet("qru_saved") || "[]"); list.sp
   window.addEventListener("pagehide", saveAll);
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(function() {});
+    navigator.serviceWorker.getRegistrations().then(function(regs) {
+      for (var i = 0; i < regs.length; i++) {
+        regs[i].unregister();
+      }
+    });
+  }
+  if (window.caches) {
+    caches.keys().then(function(keys) {
+      for (var i = 0; i < keys.length; i++) {
+        caches.delete(keys[i]);
+      }
+    });
   }
 })();
