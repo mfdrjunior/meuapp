@@ -237,9 +237,21 @@
       </div>
     </div>
 
-    <div id="qual-result-box" class="card" style="display:none; text-align:center;">
+        <div id="qual-result-box" class="card" style="display:none; text-align:center;">
       <h3>PRÉVIA DA QUALIFICAÇÃO</h3>
-      <img id="qual-final-img" src="" style="width:100%; border-radius:6px; border:1px solid #94a3b8; margin-bottom:10px;">
+      <div style="font-size:12px; color:#cbd5e1; margin-bottom:8px;">Arraste a placa na foto com o dedo ou ajuste abaixo:</div>
+      <canvas id="qual-canvas" style="width:100%; border-radius:6px; border:1px solid #94a3b8; margin-bottom:10px; touch-action:none; cursor:grab;"></canvas>
+      <div class="btn-row" style="margin-bottom:8px;">
+        <button type="button" class="btn-small" onclick="ajustarPlacaQual('altura', 0.04)">+ Altura</button>
+        <button type="button" class="btn-small" onclick="ajustarPlacaQual('altura', -0.04)">- Altura</button>
+        <button type="button" class="btn-small" onclick="ajustarPlacaQual('largura', 0.05)">+ Largura</button>
+        <button type="button" class="btn-small" onclick="ajustarPlacaQual('largura', -0.05)">- Largura</button>
+      </div>
+      <div class="btn-row" style="margin-bottom:10px;">
+        <button type="button" class="btn-small" onclick="ajustarPlacaQual('y', -25)">Subir</button>
+        <button type="button" class="btn-small" onclick="ajustarPlacaQual('y', 25)">Descer</button>
+        <button type="button" class="btn-small" onclick="ajustarPlacaQual('reset', 0)">Posição Padrão</button>
+      </div>
       <div class="btn-row">
         <button type="button" class="btn-act bg-green" onclick="compartilharQualificacao()">WhatsApp / Compartilhar</button>
         <button type="button" class="btn-act bg-blue" onclick="salvarFotoQualificacao()">Salvar na Pasta</button>
