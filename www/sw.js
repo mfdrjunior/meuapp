@@ -1,7 +1,9 @@
-var CACHE_NAME = "folha-qru-v1";
+var CACHE_NAME = "folha-qru-v2";
 var ARQUIVOS_OFFLINE = [
   "./",
   "./index.html",
+  "./estilo.css",
+  "./app.js",
   "./manifest.json",
   "./fundo.png"
 ];
