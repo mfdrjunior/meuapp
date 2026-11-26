@@ -1651,8 +1651,8 @@ function atualizarResenha() {
 
 function centralizarLinhaWpp(txt) {
   var larguraRef = 46;
-  var pad = Math.max(0, Math.floor((larguraRef - txt.length) / 2));
-  return " ".repeat(pad) + "*" + txt + "*";
+  var pad = Math.max(0, Math.round(((larguraRef - txt.length) / 2) * 1.45));
+  return "\u200B" + " ".repeat(pad) + "*" + txt + "*";
 }
 
 function obterTextoEditadoResenha(modoWpp) {
@@ -1674,6 +1674,8 @@ function obterTextoEditadoResenha(modoWpp) {
           var rot = txt.slice(0, idxDoisPontos + 1);
           var val = txt.slice(idxDoisPontos + 1);
           linhas.push("*" + rot + "*" + val);
+        } else if (modoWpp && el.querySelector("b")) {
+          linhas.push("*" + txt + "*");
         } else {
           linhas.push(txt);
         }
