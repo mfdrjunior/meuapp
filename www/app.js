@@ -514,31 +514,45 @@ function onBodyKey(e) {
     }
   }
 }
-function httpGetJson(url) {
+function httpGetJson(url, paramsObj) {
   var CapHttp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp;
   if (CapHttp && CapHttp.get) {
-    return CapHttp.get({
+    var req = {
       url: url,
       headers: {
         "Accept": "application/json",
         "User-Agent": "FolhaDeQRU-Android/1.0"
       }
-    }).then(function(res) {
+    };
+    if (paramsObj) req.params = paramsObj;
+    return CapHttp.get(req).then(function(res) {
       if (res.status >= 200 && res.status < 300) {
         return typeof res.data === "string" ? JSON.parse(res.data) : res.data;
       }
       throw new Error("Status " + res.status);
     });
   }
-  return fetch(url).then(function(r) {
+  var fullUrl = url;
+  if (paramsObj) {
+    var qs = Object.keys(paramsObj).map(function(k) {
+      return encodeURIComponent(k) + "=" + encodeURIComponent(paramsObj[k]);
+    }).join("&");
+    fullUrl = url + "?" + qs;
+  }
+  return fetch(fullUrl).then(function(r) {
     if (!r.ok) throw new Error("HTTP " + r.status);
     return r.json();
   });
 }
 
 function consultarBairroApi(lat, lon) {
-  var url1 = "https://bigdatacloud.net" + lat + "&longitude=" + lon + "&localityLanguage=pt";
-  return httpGetJson(url1)
+  var latStr = String(lat);
+  var lonStr = String(lon);
+  return httpGetJson("https://bigdatacloud.net", {
+    latitude: latStr,
+    longitude: lonStr,
+    localityLanguage: "pt"
+  })
     .then(function(j) {
       var bairro = j.locality || "";
       var cidade = j.city || "";
@@ -550,8 +564,10 @@ function consultarBairroApi(lat, lon) {
       throw new Error("Sem bairro");
     })
     .catch(function() {
-      var url2 = "https://komoot.io" + lon + "&lat=" + lat;
-      return httpGetJson(url2).then(function(j2) {
+      return httpGetJson("https://komoot.io", {
+        lon: lonStr,
+        lat: latStr
+      }).then(function(j2) {
         var feat = j2 && j2.features && j2.features.length > 0 ? j2.features : null;
         var props = feat ? feat.properties : {};
         var b2 = props.district || props.suburb || props.neighbourhood || props.locality || props.name || "";
@@ -561,8 +577,12 @@ function consultarBairroApi(lat, lon) {
       });
     })
     .catch(function() {
-      var url3 = "https://openstreetmap.org" + lat + "&lon=" + lon + "&accept-language=pt-BR";
-      return httpGetJson(url3).then(function(j3) {
+      return httpGetJson("https://openstreetmap.org", {
+        format: "json",
+        lat: latStr,
+        lon: lonStr,
+        "accept-language": "pt-BR"
+      }).then(function(j3) {
         var b3 = (j3.address && (j3.address.suburb || j3.address.neighbourhood || j3.address.quarter || j3.address.city_district)) || "";
         var c3 = (j3.address && (j3.address.city || j3.address.town || j3.address.village)) || "";
         return { bairro: b3, cidade: c3 };
