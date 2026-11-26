@@ -58,7 +58,7 @@
   .hdr-txt { font-size: 13px; line-height: 1.45; text-align: justify; color: #000; }
   .space-2 { height: 26px; }
   #txt-body { width: 100%; height: 280px; resize: none; overflow-y: auto; border: 1px dashed #94a3b8; padding: 8px; font-size: 13.5px; line-height: 1.5; color: #000; background: #fff; text-align: justify; margin-top: 0; }
-  .res-preview { font-size: 13.5px; line-height: 1.55; color: #000; text-align: left; }
+  .res-preview { font-size: 13.5px; line-height: 1.55; color: #000; text-align: left; outline: none; min-height: 120px; }
   .res-center { text-align: center; font-weight: bold; }
   .res-title { text-align: center; font-weight: bold; padding: 4px 0; margin: 10px 0; text-transform: uppercase; }
   .res-line { margin-bottom: 3px; text-align: justify; }
@@ -83,6 +83,7 @@
       <div class="title-main">FOLHA DE QRU/RELATÓRIO</div>
       <button type="button" class="btn-big btn-yellow" onclick="abrirCabecalho()">Gerar Folha de QRU/Relatório</button>
       <button type="button" class="btn-big btn-yellow" onclick="abrirResenha()">Resenha de Ocorrência</button>
+      <button type="button" class="btn-big btn-yellow" onclick="abrirMdip()">MDIP</button>
       <input type="file" id="cam-input" accept="image/*" capture="environment" style="display:none" onchange="onFotoCapturada(event)">
       <button type="button" class="btn-big btn-yellow" onclick="abrirCameraQualificacao()">Foto e Qualificação</button>
       <button type="button" class="btn-big btn-dark" onclick="abrirSalvos()">Abrir Relatório Salvo (<span id="cnt-saved">0</span>)</button>
@@ -103,7 +104,7 @@
           <option value="RELATÓRIO DE PATRULHAMENTO">Relatório de Patrulhamento</option>
         </select>
       </div>
-      <div class="row"><span class="dot"></span><span class="lbl">Batalhão:</span><input type="text" id="f-uni" placeholder="BAEP, 2 BAEP, CAEP, PAEP..." oninput="onUnitChange()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">Batalhão:</span><input type="text" id="f-uni" placeholder="BAEP, 2 BAEP, 39i, 6m..." oninput="onUnitChange()"></div>
       <div class="row"><span class="dot"></span><span class="lbl">Data:</span><input type="text" id="f-data" oninput="saveAll()"></div>
       <div class="row"><span class="dot"></span><span class="lbl">Horário:</span><input type="text" id="f-hora" placeholder="Ex: 14 às 02" onblur="formatHourInput()" oninput="saveAll()"></div>
       <div class="row"><span class="dot"></span><span class="lbl">Cia:</span><input type="text" id="f-cia" placeholder="Ex: 1, 2, 3..." onblur="formatCiaInput()" oninput="saveAll()"></div>
@@ -211,16 +212,16 @@
 
     <div class="card">
       <h3>DADOS DO QUALIFICADO</h3>
-      <div class="row"><span class="dot"></span><span class="lbl">Batalhão:</span><input type="text" id="q-uni" placeholder="Ex: 2 baep" onblur="formatarBatalhaoQual()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">Batalhão:</span><input type="text" id="q-uni" placeholder="Ex: 2 baep, 39i" onblur="formatarBatalhaoQual()"></div>
       <div class="row"><span class="dot"></span><span class="lbl">Nome:</span><input type="text" id="q-nome"></div>
       <div class="row"><span class="dot"></span><span class="lbl">Filiação:</span><input type="text" id="q-filiacao"></div>
-      <div class="row"><span class="dot"></span><span class="lbl">RG:</span><input type="text" id="q-rg" placeholder="xx.xxx.xx-x ou xx.xxx.xxx" onblur="formatarRgQual()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">RG:</span><input type="text" id="q-rg" placeholder="xx.xxx.xxx-x ou xx.xxx.xxx" onblur="formatarRgQual()"></div>
       <div class="row"><span class="dot"></span><span class="lbl">Vulgo:</span><input type="text" id="q-vulgo"></div>
       <div class="row"><span class="dot"></span><span class="lbl">Data:</span><input type="text" id="q-data" placeholder="xx/xx/xx ou xx/xx/xxxx" onblur="formatarDataQual('q-data')"></div>
       <div class="row"><span class="dot"></span><span class="lbl">Artigo:</span><input type="text" id="q-artigo"></div>
       <div class="row"><span class="dot"></span><span class="lbl">DTN:</span><input type="text" id="q-dtn" placeholder="xx/xx/xx ou xx/xx/xxxx" onblur="formatarDataQual('q-dtn')"></div>
       <div class="row"><span class="dot"></span><span class="lbl">DP:</span><input type="text" id="q-dp" placeholder="Ex: 1, 2, 3..." onblur="formatarDpQual()"></div>
-      <div class="row"><span class="dot"></span><span class="lbl">Cidade:</span><input type="text" id="q-cidade"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">Cidade:</span><input type="text" id="q-cidade" onblur="formatarCidadeQual()"></div>
       <div class="row"><span class="dot"></span><span class="lbl">BOPM:</span><input type="text" id="q-bopm"></div>
       <div class="row"><span class="dot"></span><span class="lbl">BOPC:</span><input type="text" id="q-bopc"></div>
       <div class="row"><span class="dot"></span><span class="lbl">Localidade que Atua:</span><input type="text" id="q-local"></div>
@@ -251,7 +252,7 @@
       <h3>DADOS DA OCORRÊNCIA</h3>
       <div class="row"><span class="dot"></span><span class="lbl">Secretaria:</span><input type="text" id="r-sec" placeholder="Ex: SSP" onblur="formatarSecResenha()" oninput="atualizarResenha()"></div>
       <div class="row"><span class="dot"></span><span class="lbl">Instituição:</span><input type="text" id="r-inst" placeholder="Ex: PMESP" onblur="formatarInstResenha()" oninput="atualizarResenha()"></div>
-      <div class="row"><span class="dot"></span><span class="lbl">Batalhão:</span><input type="text" id="r-bat" placeholder="Ex: 2baep" onblur="formatarBatResenha()" oninput="atualizarResenha()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">Batalhão:</span><input type="text" id="r-bat" placeholder="Ex: 2baep, 39i" onblur="formatarBatResenha()" oninput="atualizarResenha()"></div>
       <div class="row"><span class="dot"></span><span class="lbl">Companhia:</span><input type="text" id="r-cia" placeholder="Ex: 1, 2, 3..." onblur="formatarCiaResenha()" oninput="atualizarResenha()"></div>
       <div class="row"><span class="dot"></span><span class="lbl">Viatura:</span><input type="text" id="r-vtr" placeholder="Ex: e02123" onblur="formatarVtrResenha()" oninput="atualizarResenha()"></div>
       <div class="row"><span class="dot"></span><span class="lbl">Cmt:</span><input type="text" id="r-cmte" list="dl-equipe" onblur="formatarPolicialResenha('r-cmte')" oninput="atualizarResenha()"></div>
@@ -263,16 +264,24 @@
       <div class="row"><span class="dot"></span><span class="lbl">Data:</span><input type="text" id="r-dt" placeholder="Ex: 15062026 ou 15jun26" oninput="atualizarResenha()"></div>
       <div class="row"><span class="dot"></span><span class="lbl">Hora:</span><input type="text" id="r-hr" placeholder="Ex: 1530 ou 15:30hrs" oninput="atualizarResenha()"></div>
       <div class="row"><span class="dot"></span><span class="lbl">Local:</span><input type="text" id="r-local" oninput="atualizarResenha()"></div>
-      <div class="row"><span class="dot"></span><span class="lbl">Área:</span><input type="text" id="r-area" placeholder="Ex: 1 cia / 39 bpmi" onblur="formatarAreaResenha()" oninput="atualizarResenha()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">Área:</span><input type="text" id="r-area" placeholder="Ex: 1 cia 6i" onblur="formatarAreaResenha()" oninput="atualizarResenha()"></div>
       <div class="row"><span class="dot"></span><span class="lbl">BOPM:</span><input type="text" id="r-bopm" oninput="atualizarResenha()"></div>
       <div class="row"><span class="dot"></span><span class="lbl">BOPC:</span><input type="text" id="r-bopc" oninput="atualizarResenha()"></div>
-      <div class="row"><span class="dot"></span><span class="lbl">DP:</span><input type="text" id="r-dp" placeholder="Ex: 1, 2, 3..." onblur="formatarDpResenha()" oninput="atualizarResenha()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">DP:</span><input type="text" id="r-dp" placeholder="Ex: 1 dp santos" onblur="formatarDpResenha()" oninput="atualizarResenha()"></div>
       <div class="row"><span class="dot"></span><span class="lbl">Delegado:</span><input type="text" id="r-del" oninput="atualizarResenha()"></div>
 
-      <div id="r-envolvidos-box" style="margin-top:10px; border-top:1px dashed #475569; padding-top:10px;"></div>
-      <div class="btn-row" style="margin-bottom:12px;">
-        <button type="button" class="btn-act bg-blue" onclick="adicionarEnvolvido('Indiciado')">+ Indiciado</button>
-        <button type="button" class="btn-act bg-orange" onclick="adicionarEnvolvido('Sindicado')">+ Sindicado</button>
+      <div style="margin-top:10px; border-top:1px dashed #475569; padding-top:10px;">
+        <div id="r-indiciados-box"></div>
+        <div class="btn-row" style="margin-bottom:10px;">
+          <button type="button" class="btn-act bg-blue" onclick="adicionarIndiciado()">+ Indiciado</button>
+        </div>
+      </div>
+
+      <div style="margin-top:10px; border-top:1px dashed #475569; padding-top:10px;">
+        <div id="r-sindicados-box"></div>
+        <div class="btn-row" style="margin-bottom:12px;">
+          <button type="button" class="btn-act bg-orange" onclick="adicionarSindicado()">+ Sindicado</button>
+        </div>
       </div>
 
       <div class="row"><span class="dot"></span><span class="lbl">Apreensões:</span><input type="text" id="r-apr" placeholder="Separe os itens por vírgula (,)" oninput="atualizarResenha()"></div>
@@ -283,7 +292,8 @@
     </div>
 
     <div class="sheet">
-      <div id="res-preview-box" class="res-preview"></div>
+      <div style="font-size:11px; color:#64748b; margin-bottom:6px; text-align:right;">Toque no texto abaixo para editar manualmente antes de enviar</div>
+      <div id="res-preview-box" class="res-preview" contenteditable="true"></div>
     </div>
 
     <div class="card">
@@ -294,6 +304,99 @@
       <div class="btn-row">
         <button type="button" class="btn-act bg-orange" onclick="salvarResenhaApp()">Salvar no App</button>
         <button type="button" class="btn-act bg-gray" onclick="exportarResenhaTxt()">Salvar na Pasta</button>
+      </div>
+    </div>
+  </div>
+  <div id="mdip-screen" class="screen">
+    <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+      <button type="button" class="btn-small" onclick="voltarInicio()">Início</button>
+      <span style="font-size:12px; color:#eab308; font-weight:bold;">MDIP</span>
+      <button type="button" class="btn-small" onclick="limparMdip()">Limpar</button>
+    </div>
+
+    <div class="card">
+      <h3>MORTE DECORRENTE DE INTERVENÇÃO POLICIAL</h3>
+      <div class="row"><span class="dot"></span><span class="lbl">Data:</span><input type="text" id="m-data" placeholder="xx/xx/xx ou xx/xx/xxxx" onblur="formatarDataQual('m-data'); atualizarMdip();" oninput="atualizarMdip()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">QTR:</span><input type="text" id="m-qtr" placeholder="Ex: 03:45" oninput="atualizarMdip()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">Área:</span><input type="text" id="m-area" placeholder="Ex: 1 cia 6i" onblur="formatarCampoMilitarMdip('m-area')" oninput="atualizarMdip()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">Cia:</span><input type="text" id="m-cia" placeholder="Ex: 1 cia aep ou 1" onblur="formatarCiaMdip()" oninput="atualizarMdip()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">QTH dos fatos:</span><input type="text" id="m-qth" onblur="formatarCampoMilitarMdip('m-qth')" oninput="atualizarMdip()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">QTR acion. Correg/Atend.:</span><input type="text" id="m-correg" oninput="atualizarMdip()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">Viatura:</span><input type="text" id="m-vtr" placeholder="Ex: e02123" onblur="formatarVtrMdip()" oninput="atualizarMdip()"></div>
+
+      <div style="margin-top:10px; border-top:1px dashed #475569; padding-top:10px;">
+        <div class="row"><span class="dot"></span><span class="lbl">Cmte Equipe:</span><input type="text" id="m-cmt" list="dl-equipe" onblur="formatarPolicialMdip('m-cmt')" oninput="atualizarMdip()"></div>
+        <div class="row"><span class="dot"></span><span class="lbl">Arma:</span><input type="text" id="m-cmt-arma" oninput="atualizarMdip()"></div>
+        <div class="row"><span class="dot"></span><span class="lbl">Qtde Disparos:</span><input type="text" id="m-cmt-disp" oninput="atualizarMdip()"></div>
+        <div class="row"><span class="dot"></span><span class="lbl">Qtde Ocorrências:</span><input type="text" id="m-cmt-ocor" oninput="atualizarMdip()"></div>
+      </div>
+
+      <div style="margin-top:10px; border-top:1px dashed #475569; padding-top:10px;">
+        <div class="row"><span class="dot"></span><span class="lbl">Motorista:</span><input type="text" id="m-mot" list="dl-equipe" onblur="formatarPolicialMdip('m-mot')" oninput="atualizarMdip()"></div>
+        <div class="row"><span class="dot"></span><span class="lbl">Arma:</span><input type="text" id="m-mot-arma" oninput="atualizarMdip()"></div>
+        <div class="row"><span class="dot"></span><span class="lbl">Qtde Disparos:</span><input type="text" id="m-mot-disp" oninput="atualizarMdip()"></div>
+        <div class="row"><span class="dot"></span><span class="lbl">Qtde Ocorrências:</span><input type="text" id="m-mot-ocor" oninput="atualizarMdip()"></div>
+      </div>
+
+      <div style="margin-top:10px; border-top:1px dashed #475569; padding-top:10px;">
+        <div class="row"><span class="dot"></span><span class="lbl">3º Homem:</span><input type="text" id="m-h3" list="dl-equipe" onblur="formatarPolicialMdip('m-h3')" oninput="atualizarMdip()"></div>
+        <div class="row"><span class="dot"></span><span class="lbl">Arma:</span><input type="text" id="m-h3-arma" oninput="atualizarMdip()"></div>
+        <div class="row"><span class="dot"></span><span class="lbl">Qtde Disparos:</span><input type="text" id="m-h3-disp" oninput="atualizarMdip()"></div>
+        <div class="row"><span class="dot"></span><span class="lbl">Qtde Ocorrências:</span><input type="text" id="m-h3-ocor" oninput="atualizarMdip()"></div>
+      </div>
+
+      <div style="margin-top:10px; border-top:1px dashed #475569; padding-top:10px;">
+        <div class="row"><span class="dot"></span><span class="lbl">4º Homem:</span><input type="text" id="m-h4" list="dl-equipe" onblur="formatarPolicialMdip('m-h4')" oninput="atualizarMdip()"></div>
+        <div class="row"><span class="dot"></span><span class="lbl">Arma:</span><input type="text" id="m-h4-arma" oninput="atualizarMdip()"></div>
+        <div class="row"><span class="dot"></span><span class="lbl">Qtde Disparos:</span><input type="text" id="m-h4-disp" oninput="atualizarMdip()"></div>
+        <div class="row"><span class="dot"></span><span class="lbl">Qtde Ocorrências:</span><input type="text" id="m-h4-ocor" oninput="atualizarMdip()"></div>
+      </div>
+
+      <div style="margin-top:10px; border-top:1px dashed #475569; padding-top:10px;">
+        <div class="row"><span class="dot"></span><span class="lbl">5º Homem:</span><input type="text" id="m-h5" list="dl-equipe" onblur="formatarPolicialMdip('m-h5')" oninput="atualizarMdip()"></div>
+        <div class="row"><span class="dot"></span><span class="lbl">Arma:</span><input type="text" id="m-h5-arma" oninput="atualizarMdip()"></div>
+        <div class="row"><span class="dot"></span><span class="lbl">Qtde Disparos:</span><input type="text" id="m-h5-disp" oninput="atualizarMdip()"></div>
+        <div class="row"><span class="dot"></span><span class="lbl">Qtde Ocorrências:</span><input type="text" id="m-h5-ocor" oninput="atualizarMdip()"></div>
+      </div>
+
+      <div id="m-feridos-box" style="margin-top:10px; border-top:1px dashed #475569; padding-top:10px;"></div>
+      <div class="btn-row" style="margin-bottom:12px;">
+        <button type="button" class="btn-act bg-blue" onclick="adicionarFeridoMdip()">+ Adicionar Ferido</button>
+      </div>
+
+      <div class="row"><span class="dot"></span><span class="lbl">DP:</span><input type="text" id="m-dp" placeholder="Ex: 1 dp santos" onblur="formatarDpMdip()" oninput="atualizarMdip()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">Delegado:</span><input type="text" id="m-del" oninput="atualizarMdip()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">QTR Ciência:</span><input type="text" id="m-qtr-ciencia" oninput="atualizarMdip()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">BOPM:</span><input type="text" id="m-bopm" oninput="atualizarMdip()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">BOPC:</span><input type="text" id="m-bopc" oninput="atualizarMdip()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">QTR solic. resgate rede:</span><input type="text" id="m-qtr-rede" oninput="atualizarMdip()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">Viaturas no local:</span><input type="text" id="m-vtrs-local" oninput="atualizarMdip()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">Viatura IC:</span><input type="text" id="m-vtr-ic" onblur="formatarVtrCampo('m-vtr-ic'); atualizarMdip();" oninput="atualizarMdip()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">Perito:</span><input type="text" id="m-perito" oninput="atualizarMdip()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">QTR chegada:</span><input type="text" id="m-qtr-chegada" oninput="atualizarMdip()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">Objetos apreendidos:</span><input type="text" id="m-apr" placeholder="Separe os itens por vírgula (,)" oninput="atualizarMdip()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">Resgate:</span><input type="text" id="m-resgate" oninput="atualizarMdip()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">QTR no local:</span><input type="text" id="m-qtr-local" oninput="atualizarMdip()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">QTR de saída:</span><input type="text" id="m-qtr-saida" oninput="atualizarMdip()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">QTR no PS:</span><input type="text" id="m-qtr-ps" oninput="atualizarMdip()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">PS:</span><input type="text" id="m-ps" onblur="formatarCampoMilitarMdip('m-ps')" oninput="atualizarMdip()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">Médico + CRM:</span><input type="text" id="m-medico" oninput="atualizarMdip()"></div>
+      <div class="row"><span class="dot"></span><span class="lbl">VTR Escolta:</span><input type="text" id="m-vtr-escolta" onblur="formatarVtrCampo('m-vtr-escolta'); atualizarMdip();" oninput="atualizarMdip()"></div>
+    </div>
+
+    <div class="sheet">
+      <div style="font-size:11px; color:#64748b; margin-bottom:6px; text-align:right;">Toque no texto abaixo para editar manualmente antes de enviar</div>
+      <div id="mdip-preview-box" class="res-preview" contenteditable="true"></div>
+    </div>
+
+    <div class="card">
+      <div class="btn-row">
+        <button type="button" class="btn-act bg-green" onclick="enviarMdipWpp()">WhatsApp</button>
+        <button type="button" class="btn-act bg-blue" onclick="copiarMdip()">Copiar</button>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn-act bg-orange" onclick="salvarMdipApp()">Salvar no App</button>
+        <button type="button" class="btn-act bg-gray" onclick="exportarMdipTxt()">Salvar na Pasta</button>
       </div>
     </div>
   </div>
