@@ -9,7 +9,7 @@ var NL = String.fromCharCode(10);
 var IMAGEM_PADRAO = "./fundo.png";
 var fotoQualBase64 = "";
 var fotoQualFinalBase64 = "";
-var resenhaEnvolvidos = new Array({ tipo: "Indiciado", nome: "", rg: "" });
+var resenhaEnvolvidos = new Array({ tipo: "Indiciado", nome: "", rg: "", artigo: "" });
 
 function $(id) { return document.getElementById(id); }
 function sGet(k) {
@@ -118,6 +118,34 @@ function resolverNomeBatalhao(raw) {
     res = (antesP ? antesP + "° " : "") + "Pelotão de Ações Especiais de Polícia" + (depoisP ? " " + depoisP : "");
   }
   return res;
+}
+
+function formatarSiglaBatalhaoCurta(raw) {
+  var v = (raw || "").trim();
+  if (!v) return "";
+  var up = v.toUpperCase();
+  var m = up.match(/^([0-9]+)\s*[°º]?\s*(BAEP|BPMI|BPM\/I|BPMM|BPM\/M|BPCHQ|CAEP|PAEP)(.*)$/);
+  if (m) {
+    var num = m[1];
+    var tipo = m[2];
+    var resto = m[3] ? m[3].trim() : "";
+    if (tipo === "BPMI") tipo = "BPM/I";
+    if (tipo === "BPMM") tipo = "BPM/M";
+    if (tipo === "BPCHQ") tipo = "BPChq";
+    return num + "° " + tipo + (resto ? " " + resto : "");
+  }
+  return v;
+}
+
+function formatarDpTexto(raw) {
+  var v = (raw || "").trim();
+  if (!v) return "";
+  if (isNum(v)) return v + "º DP";
+  var m = v.match(/^([0-9]+)\s*[°º]?\s*DP(.*)$/i);
+  if (m) {
+    return m[1] + "º DP" + (m[2] ? m[2] : "");
+  }
+  return v;
 }
 function onUnitChange() {
   var res = resolverNomeBatalhao($("f-uni").value);
@@ -306,6 +334,35 @@ function onBodyKey(e) {
     }
   }
 }
+function consultarBairroApi(lat, lon) {
+  var url1 = "https://bigdatacloud.net" + lat + "&longitude=" + lon + "&localityLanguage=pt";
+  return fetch(url1)
+    .then(function(r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
+    .then(function(j) {
+      var bairro = j.locality || "";
+      var cidade = j.city || "";
+      if (!bairro && j.localityInfo && j.localityInfo.administrative) {
+        var adm = j.localityInfo.administrative;
+        if (adm.length > 0) bairro = adm[adm.length - 1].name || "";
+      }
+      if (bairro) return { bairro: bairro, cidade: cidade };
+      throw new Error("Sem bairro");
+    })
+    .catch(function() {
+      var url2 = "https://openstreetmap.org" + lat + "&lon=" + lon + "&accept-language=pt-BR";
+      return fetch(url2)
+        .then(function(r2) { return r2.json(); })
+        .then(function(j2) {
+          var b2 = (j2.address && (j2.address.suburb || j2.address.neighbourhood || j2.address.quarter || j2.address.city_district)) || "";
+          var c2 = (j2.address && (j2.address.city || j2.address.town || j2.address.village)) || "";
+          return { bairro: b2, cidade: c2 };
+        });
+    });
+}
+
 function processarPosicaoGps(lat, lon) {
   var radioH = document.querySelector('input[name="gps-h"]:checked');
   var h = radioH ? parseInt(radioH.value, 10) : 1;
@@ -315,17 +372,17 @@ function processarPosicaoGps(lat, lon) {
 
   if (!lastPos || Math.abs(lat - lastPos.lat) + Math.abs(lon - lastPos.lon) > 0.0015) {
     lastPos = { lat: lat, lon: lon };
-    fetch("https://openstreetmap.org" + lat + "&lon=" + lon + "&accept-language=pt-BR")
-      .then(function(r) { return r.json(); })
-      .then(function(j) {
-        var b = (j.address && (j.address.suburb || j.address.neighbourhood || j.address.quarter || j.address.city_district)) || "";
+    consultarBairroApi(lat, lon)
+      .then(function(res) {
+        var b = res.bairro || "";
         if (b && bairros.indexOf(b) === -1) {
           bairros.push(b);
           saveAll();
         }
         $("gps-info").textContent = "Bairros: " + (bairros.join(", ") || "buscando...");
-      }).catch(function() {
-        $("gps-info").textContent = "GPS ativo (aguardando rede para nome do bairro)...";
+      })
+      .catch(function(err) {
+        $("gps-info").textContent = "GPS ativo (aguardando rede: " + (err.message || "sem conexão") + ")...";
       });
   }
 }
@@ -401,20 +458,19 @@ function testarGpsAgora() {
   if (!navigator.geolocation) return alert("Sem GPS neste aparelho.");
   $("gps-info").textContent = "Consultando satélite e bairro atual...";
   navigator.geolocation.getCurrentPosition(function(p) {
-    fetch("https://openstreetmap.org" + p.coords.latitude + "&lon=" + p.coords.longitude + "&accept-language=pt-BR")
-      .then(function(r) { return r.json(); })
-      .then(function(j) {
-        var b = (j.address && (j.address.suburb || j.address.neighbourhood || j.address.quarter || j.address.city_district)) || "Bairro não identificado";
-        var c = (j.address && (j.address.city || j.address.town || j.address.village)) || "";
+    consultarBairroApi(p.coords.latitude, p.coords.longitude)
+      .then(function(res) {
+        var b = res.bairro || "Bairro não identificado";
+        var c = res.cidade || "";
         $("gps-info").textContent = "Teste OK: " + b + (c ? " (" + c + ")" : "") + (bairros.length ? " | Acumulados: " + bairros.join(", ") : "");
-      }).catch(function() {
-        $("gps-info").textContent = "GPS OK (" + p.coords.latitude.toFixed(4) + ", " + p.coords.longitude.toFixed(4) + "), mas sem internet para buscar o nome do bairro.";
+      })
+      .catch(function(err) {
+        $("gps-info").textContent = "GPS OK (" + p.coords.latitude.toFixed(4) + ", " + p.coords.longitude.toFixed(4) + "), falha na rede: " + (err.message || "verifique dados móveis");
       });
   }, function(err) {
-    $("gps-info").textContent = "Erro no teste GPS: " + err.message;
+    $("gps-info").textContent = "Erro no satélite GPS: " + err.message;
   }, { enableHighAccuracy: true, timeout: 10000 });
 }
-
 function fmtHora(d) { return two(d.getHours()) + ":" + two(d.getMinutes()); }
 
 function fecharBlocoGps() {
@@ -538,8 +594,20 @@ function getFullText() {
   return "Polícia Militar do Estado de São Paulo" + NL + $("out-uni").value + NL + NL + docCent + NL + $("out-hdr").innerText + NL + NL + NL + $("txt-body").value;
 }
 
-function enviarWpp(texto) {
-  window.open("https://whatsapp.com" + encodeURIComponent(texto), "_blank");
+async function enviarWpp(texto) {
+  var Share = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share;
+  if (Share) {
+    try {
+      await Share.share({
+        text: texto,
+        dialogTitle: "Enviar via WhatsApp"
+      });
+      return;
+    } catch (e) {
+      if (e && e.message && e.message.toLowerCase().indexOf("cancel") > -1) return;
+    }
+  }
+  window.location.href = "https://whatsapp.com" + encodeURIComponent(texto);
 }
 
 function sendWhats() { enviarWpp(getFullText()); }
@@ -577,9 +645,11 @@ function abrirCameraQualificacao() {
 function formatarRgTexto(raw) {
   var v = (raw || "").trim();
   if (!v) return "";
-  var limpo = v.replace(/[^0-9a-zA-Z]/g, "").toUpperCase();
-  if (limpo.length === 9 && /^[0-9]{8}[0-9X]$/.test(limpo)) {
-    return limpo.slice(0, 2) + "." + limpo.slice(2, 5) + "." + limpo.slice(5, 8) + "-" + limpo.slice(8, 9);
+  if (/^[0-9]{2}\.[0-9]{3}\.[0-9]{2}-[0-9]$/.test(v) || /^[0-9]{2}\.[0-9]{3}\.[0-9]{3}$/.test(v)) {
+    return v;
+  }
+  if (/^[0-9]{8}$/.test(v)) {
+    return v.slice(0, 2) + "." + v.slice(2, 5) + "." + v.slice(5, 7) + "-" + v.slice(7, 8);
   }
   return v;
 }
@@ -593,9 +663,24 @@ function formatarDataQual(idCampo) {
   var el = $(idCampo);
   var v = el.value.trim();
   if (!v) return;
-  var nums = v.replace(/[^0-9]/g, "");
-  if (nums.length === 8) {
-    el.value = nums.slice(0, 2) + "/" + nums.slice(2, 4) + "/" + nums.slice(4, 8);
+  if (/^[0-9]{8}$/.test(v)) {
+    el.value = v.slice(0, 2) + "/" + v.slice(2, 4) + "/" + v.slice(4, 8);
+  } else if (/^[0-9]{6}$/.test(v)) {
+    el.value = v.slice(0, 2) + "/" + v.slice(2, 4) + "/" + v.slice(4, 6);
+  }
+}
+
+function formatarBatalhaoQual() {
+  var el = $("q-uni");
+  if (el && el.value.trim()) {
+    el.value = formatarSiglaBatalhaoCurta(el.value);
+  }
+}
+
+function formatarDpQual() {
+  var el = $("q-dp");
+  if (el && el.value.trim()) {
+    el.value = formatarDpTexto(el.value);
   }
 }
 
@@ -652,9 +737,11 @@ function desenharCampoPlaca(ctx, lbl, val, x, y, wColuna, fontLbl, fontVal) {
 
 function gerarPlacaQualificacao() {
   if (!fotoQualBase64) return alert("Tire uma foto primeiro.");
+  formatarBatalhaoQual();
   formatarRgQual();
   formatarDataQual("q-data");
   formatarDataQual("q-dtn");
+  formatarDpQual();
 
   var img = new Image();
   img.onload = function() {
@@ -681,9 +768,14 @@ function gerarPlacaQualificacao() {
     var fontTitulo = Math.max(24, Math.round(largura * 0.042));
     var fontLbl = Math.max(11, Math.round(largura * 0.016));
     var fontVal = Math.max(15, Math.round(largura * 0.023));
-    var rowGap = Math.round(fontVal * 1.65);
 
-    var placaH = Math.round(fontTitulo * 1.8) + (7 * rowGap) + Math.round(padX * 1.2);
+    var alturaMinimaPlaca = Math.round(altura * 0.35);
+    var topoEspaco = Math.round(fontTitulo * 2.2);
+    var rodapeEspaco = Math.round(padX * 1.1);
+    var areaLinhas = alturaMinimaPlaca - topoEspaco - rodapeEspaco;
+    var rowGap = Math.max(Math.round(fontVal * 1.75), Math.floor(areaLinhas / 7));
+
+    var placaH = topoEspaco + (7 * rowGap) + rodapeEspaco;
     var placaX = margemExt;
     var placaY = altura - placaH - margemExt;
     if (placaY < 10) placaY = 10;
@@ -709,7 +801,7 @@ function gerarPlacaQualificacao() {
     ctx.textAlign = "left";
     var x0 = placaX + padX;
     var gapCol = Math.round(innerW * 0.02);
-    y += Math.round(fontTitulo * 0.85);
+    y += Math.round(fontTitulo * 1.35);
 
     desenharCampoPlaca(ctx, "NOME:", $("q-nome").value.trim().toUpperCase(), x0, y, innerW, fontLbl, fontVal);
     y += rowGap;
@@ -818,8 +910,100 @@ async function compartilharQualificacao() {
   salvarFotoQualificacao();
 }
 
+function formatarSecResenha() {
+  var el = $("r-sec");
+  if (!el) return;
+  if (el.value.trim().toUpperCase() === "SSP") {
+    el.value = "Secretaria da Segurança Pública";
+    atualizarResenha();
+  }
+}
+
+function formatarInstResenha() {
+  var el = $("r-inst");
+  if (!el) return;
+  if (el.value.trim().toUpperCase() === "PMESP") {
+    el.value = "Polícia Militar do Estado de São Paulo";
+    atualizarResenha();
+  }
+}
+
+function formatarBatResenha() {
+  var el = $("r-bat");
+  if (!el) return;
+  var v = el.value.trim();
+  if (!v) return;
+  var up = v.toUpperCase();
+  if (up === "ROTA") {
+    el.value = "ROTA";
+  } else {
+    el.value = formatarSiglaBatalhaoCurta(v);
+  }
+  atualizarResenha();
+}
+
+function formatarCiaResenha() {
+  var el = $("r-cia");
+  if (!el) return;
+  var v = el.value.trim();
+  if (!v) return;
+  var up = v.toUpperCase();
+  if (up === "FT") el.value = "Força Tática";
+  else if (up === "CANIL") el.value = "Canil";
+  else if (up === "CAVALARIA") el.value = "Cavalaria";
+  else if (up === "ROCAM") el.value = "ROCAM";
+  else if (isNum(v)) el.value = v + "ª Cia";
+  else {
+    var m = v.match(/^([0-9]+)\s*[ªa]?\s*CIA$/i);
+    if (m) el.value = m + "ª Cia";
+  }
+  atualizarResenha();
+}
+
+function formatarVtrResenha() {
+  var el = $("r-vtr");
+  if (!el) return;
+  var v = el.value.trim();
+  if (!v) return;
+  var primeira = v.charAt(0).toUpperCase();
+  if (primeira >= "A" && primeira <= "Z") {
+    var resto = v.slice(1).trim();
+    if (resto.charAt(0) === "-") resto = resto.slice(1).trim();
+    el.value = resto ? primeira + "-" + resto : primeira;
+    atualizarResenha();
+  }
+}
+
+function formatarPolicialResenha(idCampo) {
+  var el = $(idCampo);
+  if (!el || !el.value.trim()) return;
+  el.value = formatRankAndName(el.value);
+  addEquipe(el.value);
+  atualizarResenha();
+}
+
+function formatarAreaResenha() {
+  var el = $("r-area");
+  if (!el || !el.value.trim()) return;
+  var txt = el.value.trim();
+  txt = txt.replace(/\b([0-9]+)\s*[ªa]?\s*cia\b/gi, "$1ª Cia");
+  txt = txt.replace(/\b([0-9]+)\s*[°º]?\s*bpm\/?i\b/gi, "$1º BPM/I");
+  txt = txt.replace(/\b([0-9]+)\s*[°º]?\s*bpm\/?m\b/gi, "$1º BPM/M");
+  txt = txt.replace(/\b([0-9]+)\s*[°º]?\s*baep\b/gi, "$1º BAEP");
+  txt = txt.replace(/\b([0-9]+)\s*[°º]?\s*bpchq\b/gi, "$1º BPChq");
+  el.value = txt;
+  atualizarResenha();
+}
+
+function formatarDpResenha() {
+  var el = $("r-dp");
+  if (!el || !el.value.trim()) return;
+  el.value = formatarDpTexto(el.value);
+  atualizarResenha();
+}
+
 function adicionarEnvolvido(tipo) {
-  resenhaEnvolvidos.push({ tipo: tipo, nome: "", rg: "" });
+  resenhaEnvolvidos.push({ tipo: tipo, nome: "", rg: "", artigo: "" });
   renderizarEnvolvidosResenha();
   atualizarResenha();
 }
@@ -852,17 +1036,22 @@ function renderizarEnvolvidosResenha() {
   var html = "";
   for (var i = 0; i < resenhaEnvolvidos.length; i++) {
     var env = resenhaEnvolvidos[i];
-    var nomeEsc = env.nome.replace(/"/g, "&quot;");
-    var rgEsc = env.rg.replace(/"/g, "&quot;");
+    var nomeEsc = (env.nome || "").replace(/"/g, "&quot;");
+    var rgEsc = (env.rg || "").replace(/"/g, "&quot;");
+    var artEsc = (env.artigo || "").replace(/"/g, "&quot;");
     html += '<div class="env-box">' +
       '<div class="row" style="margin-bottom:6px;">' +
         '<span class="dot"></span><span class="lbl">' + env.tipo + ':</span>' +
         '<input type="text" value="' + nomeEsc + '" oninput="onEnvolvidoInput(' + i + ', \'nome\', this.value)">' +
         '<button type="button" class="btn-small" style="background:#dc2626;border:none;padding:6px 10px;" onclick="removerEnvolvido(' + i + ')">X</button>' +
       '</div>' +
-      '<div class="row" style="margin-bottom:0;">' +
+      '<div class="row" style="margin-bottom:6px;">' +
         '<span class="dot"></span><span class="lbl">RG:</span>' +
-        '<input type="text" value="' + rgEsc + '" placeholder="xx.xxx.xxx-x" oninput="onEnvolvidoInput(' + i + ', \'rg\', this.value)" onblur="onEnvolvidoRgBlur(' + i + ', this)">' +
+        '<input type="text" value="' + rgEsc + '" placeholder="xx.xxx.xx-x ou xx.xxx.xxx" oninput="onEnvolvidoInput(' + i + ', \'rg\', this.value)" onblur="onEnvolvidoRgBlur(' + i + ', this)">' +
+      '</div>' +
+      '<div class="row" style="margin-bottom:0;">' +
+        '<span class="dot"></span><span class="lbl">Artigo:</span>' +
+        '<input type="text" value="' + artEsc + '" oninput="onEnvolvidoInput(' + i + ', \'artigo\', this.value)">' +
       '</div>' +
     '</div>';
   }
@@ -881,9 +1070,9 @@ function formatarDataHoraMilitar(dtRaw, hrRaw) {
     var dtLimpo = dt.replace(/[^0-9A-Z]/g, "");
     var matchMes = dtLimpo.match(/^([0-9]{1,2})([A-Z]{3})([0-9]{2,4})$/);
     if (matchMes) {
-      dia = two(matchMes[1]);
-      mesSigla = matchMes[2];
-      ano2 = matchMes[3].slice(-2);
+      dia = two(matchMes);
+      mesSigla = matchMes;
+      ano2 = matchMes.slice(-2);
     } else {
       var numsDt = dt.replace(/[^0-9]/g, "");
       if (numsDt.length === 8) {
@@ -921,6 +1110,19 @@ function formatarDataHoraMilitar(dtRaw, hrRaw) {
   }
   return (dt + " " + hr).trim();
 }
+function separarItensApreensoes(raw) {
+  if (!raw) return new Array();
+  var marcado = raw.replace(/([0-9]),([0-9]+\s*(?:g|gr|grs|grama|gramas|kg|kgs|kilo|kilos|quilo|quilos|mg|ml|l|un|und|cx|pct)?\b)/gi, "$1###VIRGULA###$2");
+  marcado = marcado.replace(/(R\$\s*[0-9.]+),([0-9]{2})/gi, "$1###VIRGULA###$2");
+  var partes = marcado.split(",");
+  var res = new Array();
+  for (var i = 0; i < partes.length; i++) {
+    var item = partes[i].split("###VIRGULA###").join(",").trim();
+    if (item !== "") res.push(item);
+  }
+  return res;
+}
+
 function gerarDadosResenha() {
   var sec = $("r-sec").value.trim();
   var inst = $("r-inst").value.trim();
@@ -942,7 +1144,6 @@ function gerarDadosResenha() {
   var bopc = $("r-bopc").value.trim();
   var dp = $("r-dp").value.trim();
   var del = $("r-del").value.trim();
-  var art = $("r-art").value.trim();
   var aprRaw = $("r-apr").value.trim();
   var hist = $("r-hist").value.trim();
 
@@ -1012,7 +1213,7 @@ function gerarDadosResenha() {
   var totInd = 0, totSind = 0;
   for (var i = 0; i < resenhaEnvolvidos.length; i++) {
     var e = resenhaEnvolvidos[i];
-    if (e.nome.trim() !== "" || e.rg.trim() !== "") {
+    if ((e.nome || "").trim() !== "" || (e.rg || "").trim() !== "" || (e.artigo || "").trim() !== "") {
       if (e.tipo === "Indiciado") totInd++;
       else totSind++;
     }
@@ -1021,12 +1222,15 @@ function gerarDadosResenha() {
   var temEnvolvidos = (totInd > 0 || totSind > 0);
   if (temEnvolvidos) {
     if (del || temDadosOcor) addEspaco();
-    var cInd = 0, cSind = 0;
+    var cInd = 0, cSind = 0, primeiroEnv = true;
     for (var j = 0; j < resenhaEnvolvidos.length; j++) {
       var env = resenhaEnvolvidos[j];
-      var nm = env.nome.trim();
-      var rgVal = formatarRgTexto(env.rg);
-      if (nm !== "" || rgVal !== "") {
+      var nm = (env.nome || "").trim();
+      var rgVal = formatarRgTexto(env.rg || "");
+      var artVal = (env.artigo || "").trim();
+      if (nm !== "" || rgVal !== "" || artVal !== "") {
+        if (!primeiroEnv) addEspaco();
+        primeiroEnv = false;
         var lblEnv = env.tipo;
         if (env.tipo === "Indiciado") {
           cInd++;
@@ -1037,18 +1241,15 @@ function gerarDadosResenha() {
         }
         if (nm) addCampo(lblEnv, nm);
         if (rgVal) addCampo("RG", rgVal);
+        if (artVal) addCampo("Artigo", artVal);
       }
     }
   }
 
-  if (art) {
-    addCampo("Artigo", art);
-  }
-
   if (aprRaw) {
-    var itensApr = aprRaw.split(",").map(function(x) { return x.trim(); }).filter(function(x) { return x !== ""; });
+    var itensApr = separarItensApreensoes(aprRaw);
     if (itensApr.length > 0) {
-      if (art || temEnvolvidos || temDadosOcor) addEspaco();
+      if (temEnvolvidos || temDadosOcor) addEspaco();
       html += '<div class="res-line"><b>Apreensões:</b></div>';
       txtWpp += "*Apreensões:*" + NL;
       txtPuro += "Apreensões:" + NL;
@@ -1082,12 +1283,12 @@ function atualizarResenha() {
   box.innerHTML = res.html;
 }
 function limparResenha() {
-  var ids = new Array("r-sec", "r-inst", "r-bat", "r-cia", "r-vtr", "r-cmte", "r-mot", "r-seg1", "r-seg2", "r-seg3", "r-nat", "r-dt", "r-hr", "r-local", "r-area", "r-bopm", "r-bopc", "r-dp", "r-del", "r-art", "r-apr", "r-hist");
+  var ids = new Array("r-sec", "r-inst", "r-bat", "r-cia", "r-vtr", "r-cmte", "r-mot", "r-seg1", "r-seg2", "r-seg3", "r-nat", "r-dt", "r-hr", "r-local", "r-area", "r-bopm", "r-bopc", "r-dp", "r-del", "r-apr", "r-hist");
   for (var i = 0; i < ids.length; i++) {
     var el = $(ids[i]);
     if (el) el.value = "";
   }
-  resenhaEnvolvidos = new Array({ tipo: "Indiciado", nome: "", rg: "" });
+  resenhaEnvolvidos = new Array({ tipo: "Indiciado", nome: "", rg: "", artigo: "" });
   renderizarEnvolvidosResenha();
   atualizarResenha();
 }
