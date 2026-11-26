@@ -250,10 +250,9 @@ function formatarTextoMilitar(raw) {
     return gr + " PM " + titleCase(nome);
   });
   txt = txt.split("###TENCEL###").join("Ten Cel PM");
-
   return normalizarCidadesEAcentos(txt);
 }
-
+  
 function resolverNomeBatalhao(raw) {
   var v = (raw || "").trim(), up = v.toUpperCase(), res = v;
   if (!v) return "";
