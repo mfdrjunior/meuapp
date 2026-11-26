@@ -38,10 +38,10 @@ jobs:
           npm install @capacitor/assets
           npx capacitor-assets generate --android --iconBackgroundColor '#000000' --splashBackgroundColor '#0f172a'
 
-      - name: Configurar permissões de GPS e Rede no AndroidManifest
+      - name: Configurar permissões de GPS, Rede e Arquivos no AndroidManifest
         run: |
           MANIFEST="android/app/src/main/AndroidManifest.xml"
-          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET" \/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" \/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" \/>\n    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" \/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" \/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" \/>\n    <application/' $MANIFEST
+          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET" \/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" \/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" \/>\n    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" \/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" \/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" \/>\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" \/>\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" \/>\n    <application/' $MANIFEST
 
       - name: Sincronizar arquivos web
         run: npx cap sync android
