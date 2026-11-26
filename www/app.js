@@ -1001,6 +1001,8 @@ function retanguloArredondado(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
+var placaState = { imgObj: null, largura: 0, altura: 0, x: 0, y: null, wRatio: 1.0, hRatio: 0.40, drag: false, startX: 0, startY: 0, origX: 0, origY: 0, eventosLigados: false };
+
 function desenharCampoPlaca(ctx, lbl, val, x, y, wColuna, fontLbl, fontVal) {
   ctx.fillStyle = "#000000";
   ctx.font = "bold " + fontLbl + "px Arial";
@@ -1015,9 +1017,193 @@ function desenharCampoPlaca(ctx, lbl, val, x, y, wColuna, fontLbl, fontVal) {
   ctx.stroke();
 
   if (val) {
-    ctx.font = "bold " + fontVal + "px Arial";
+    ctx.font = "normal " + fontVal + "px Arial";
     ctx.fillText(val, x + wLbl + 4, y, wColuna - wLbl - 6);
   }
+}
+
+function renderizarCanvasQualificacao(salvarHistorico) {
+  var img = placaState.imgObj;
+  var canvas = $("qual-canvas");
+  if (!img || !canvas) return;
+
+  var largura = placaState.largura;
+  var altura = placaState.altura;
+  canvas.width = largura;
+  canvas.height = altura;
+  var ctx = canvas.getContext("2d");
+
+  ctx.drawImage(img, 0, 0, largura, altura);
+
+  var placaW = Math.round(largura * placaState.wRatio);
+  var padX = Math.round(placaW * 0.032);
+  var innerW = placaW - (padX * 2);
+
+  var escalaFonte = placaState.wRatio;
+  var fontTitulo = Math.max(22, Math.round(largura * 0.044 * escalaFonte));
+  var fontLbl = Math.max(13, Math.round(largura * 0.021 * escalaFonte));
+  var fontVal = Math.max(15, Math.round(largura * 0.0235 * escalaFonte));
+
+  var alturaAlvo = Math.round(altura * placaState.hRatio);
+  var topoEspaco = Math.round(fontTitulo * 2.2);
+  var rodapeEspaco = Math.round(padX * 1.1);
+  var areaLinhas = alturaAlvo - topoEspaco - rodapeEspaco;
+  var rowGap = Math.max(Math.round(fontVal * 1.75), Math.floor(areaLinhas / 7));
+
+  var placaH = topoEspaco + (7 * rowGap) + rodapeEspaco;
+  if (placaH > altura) placaH = altura;
+
+  if (placaState.y === null) {
+    placaState.x = Math.round((largura - placaW) / 2);
+    placaState.y = altura - placaH;
+  }
+  if (placaState.x < 0) placaState.x = 0;
+  if (placaState.x + placaW > largura) placaState.x = largura - placaW;
+  if (placaState.y < 0) placaState.y = 0;
+  if (placaState.y + placaH > altura) placaState.y = altura - placaH;
+
+  var placaX = placaState.x;
+  var placaY = placaState.y;
+
+  ctx.save();
+  retanguloArredondado(ctx, placaX, placaY, placaW, placaH, Math.round(placaW * 0.032));
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#94a3b8";
+  ctx.stroke();
+  ctx.restore();
+
+  var y = placaY + Math.round(fontTitulo * 1.2);
+  var batalhao = $("q-uni").value.trim().toUpperCase();
+  if (batalhao) {
+    ctx.fillStyle = "#000000";
+    ctx.font = "bold " + fontTitulo + "px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(batalhao, placaX + (placaW / 2), y, innerW);
+  }
+
+  ctx.textAlign = "left";
+  var x0 = placaX + padX;
+  var gapCol = Math.round(innerW * 0.02);
+  y += Math.round(fontTitulo * 1.4);
+
+  desenharCampoPlaca(ctx, "NOME:", $("q-nome").value.trim().toUpperCase(), x0, y, innerW, fontLbl, fontVal);
+  y += rowGap;
+
+  desenharCampoPlaca(ctx, "FILIAÇÃO:", $("q-filiacao").value.trim().toUpperCase(), x0, y, innerW, fontLbl, fontVal);
+  y += rowGap;
+
+  var wRg = Math.round(innerW * 0.48);
+  var wVulgo = innerW - wRg - gapCol;
+  desenharCampoPlaca(ctx, "RG:", $("q-rg").value.trim(), x0, y, wRg, fontLbl, fontVal);
+  desenharCampoPlaca(ctx, "VULGO:", $("q-vulgo").value.trim(), x0 + wRg + gapCol, y, wVulgo, fontLbl, fontVal);
+  y += rowGap;
+
+  var wData = Math.round(innerW * 0.25);
+  var wArt = Math.round(innerW * 0.21);
+  var wDtn = Math.round(innerW * 0.26);
+  var wDp = innerW - wData - wArt - wDtn - (gapCol * 3);
+  var cx = x0;
+  desenharCampoPlaca(ctx, "DATA:", $("q-data").value.trim(), cx, y, wData, fontLbl, fontVal);
+  cx += wData + gapCol;
+  desenharCampoPlaca(ctx, "ARTIGO:", $("q-artigo").value.trim(), cx, y, wArt, fontLbl, fontVal);
+  cx += wArt + gapCol;
+  desenharCampoPlaca(ctx, "DTN:", $("q-dtn").value.trim(), cx, y, wDtn, fontLbl, fontVal);
+  cx += wDtn + gapCol;
+  desenharCampoPlaca(ctx, "DP:", $("q-dp").value.trim().toUpperCase(), cx, y, wDp, fontLbl, fontVal);
+  y += rowGap;
+
+  var wCid = Math.round(innerW * 0.44);
+  var wBopm = Math.round(innerW * 0.25);
+  var wBopc = innerW - wCid - wBopm - (gapCol * 2);
+  cx = x0;
+  desenharCampoPlaca(ctx, "CIDADE:", $("q-cidade").value.trim().toUpperCase(), cx, y, wCid, fontLbl, fontVal);
+  cx += wCid + gapCol;
+  desenharCampoPlaca(ctx, "BOPM:", $("q-bopm").value.trim().toUpperCase(), cx, y, wBopm, fontLbl, fontVal);
+  cx += wBopm + gapCol;
+  desenharCampoPlaca(ctx, "BOPC:", $("q-bopc").value.trim().toUpperCase(), cx, y, wBopc, fontLbl, fontVal);
+  y += rowGap;
+
+  desenharCampoPlaca(ctx, "LOCALIDADE QUE ATUA:", $("q-local").value.trim().toUpperCase(), x0, y, innerW, fontLbl, fontVal);
+  y += rowGap;
+
+  desenharCampoPlaca(ctx, "OBS.:", $("q-obs").value.trim().toUpperCase(), x0, y, innerW, fontLbl, fontVal);
+
+  fotoQualFinalBase64 = canvas.toDataURL("image/jpeg", 0.92);
+
+  if (salvarHistorico) {
+    var dtQual = $("q-data").value.trim() || getToday();
+    var nomeQual = $("q-nome").value.trim();
+    var resumoQual = (nomeQual ? "Nome: " + nomeQual + NL : "") +
+      ($("q-rg").value.trim() ? "RG: " + $("q-rg").value.trim() + NL : "") +
+      ($("q-artigo").value.trim() ? "Artigo: " + $("q-artigo").value.trim() + NL : "") +
+      ($("q-dp").value.trim() ? "DP: " + $("q-dp").value.trim() : "");
+    registrarTrabalhoSalvo("Foto e Qualificação - " + dtQual, resumoQual.trim(), fotoQualFinalBase64);
+  }
+}
+
+function ajustarPlacaQual(tipo, delta) {
+  if (!placaState.imgObj) return;
+  if (tipo === "altura") {
+    placaState.hRatio = Math.min(0.85, Math.max(0.25, placaState.hRatio + delta));
+  } else if (tipo === "largura") {
+    placaState.wRatio = Math.min(1.0, Math.max(0.55, placaState.wRatio + delta));
+    placaState.x = Math.round((placaState.largura - Math.round(placaState.largura * placaState.wRatio)) / 2);
+  } else if (tipo === "y") {
+    placaState.y += delta;
+  } else if (tipo === "reset") {
+    placaState.wRatio = 1.0;
+    placaState.hRatio = 0.40;
+    placaState.x = 0;
+    placaState.y = null;
+  }
+  renderizarCanvasQualificacao(false);
+}
+
+function ligarEventosArrastoPlaca() {
+  var canvas = $("qual-canvas");
+  if (!canvas || placaState.eventosLigados) return;
+  placaState.eventosLigados = true;
+
+  function obterCoordCanvas(ev) {
+    var rect = canvas.getBoundingClientRect();
+    var pt = ev.touches ? ev.touches[0] : ev;
+    return {
+      cx: (pt.clientX - rect.left) * (canvas.width / rect.width),
+      cy: (pt.clientY - rect.top) * (canvas.height / rect.height)
+    };
+  }
+
+  function iniciarArrasto(ev) {
+    if (!placaState.imgObj) return;
+    var p = obterCoordCanvas(ev);
+    placaState.drag = true;
+    placaState.startX = p.cx;
+    placaState.startY = p.cy;
+    placaState.origX = placaState.x;
+    placaState.origY = placaState.y;
+  }
+
+  function moverArrasto(ev) {
+    if (!placaState.drag) return;
+    ev.preventDefault();
+    var p = obterCoordCanvas(ev);
+    placaState.x = Math.round(placaState.origX + (p.cx - placaState.startX));
+    placaState.y = Math.round(placaState.origY + (p.cy - placaState.startY));
+    renderizarCanvasQualificacao(false);
+  }
+
+  function finalizarArrasto() {
+    placaState.drag = false;
+  }
+
+  canvas.addEventListener("touchstart", iniciarArrasto, { passive: false });
+  canvas.addEventListener("touchmove", moverArrasto, { passive: false });
+  canvas.addEventListener("touchend", finalizarArrasto);
+  canvas.addEventListener("mousedown", iniciarArrasto);
+  window.addEventListener("mousemove", moverArrasto);
+  window.addEventListener("mouseup", finalizarArrasto);
 }
 
 function gerarPlacaQualificacao() {
@@ -1041,112 +1227,22 @@ function gerarPlacaQualificacao() {
       altura = Math.round(img.height * escala);
     }
 
-    var canvas = document.createElement("canvas");
-    canvas.width = largura;
-    canvas.height = altura;
-    var ctx = canvas.getContext("2d");
+    placaState.imgObj = img;
+    placaState.largura = largura;
+    placaState.altura = altura;
+    placaState.wRatio = 1.0;
+    placaState.hRatio = 0.40;
+    placaState.x = 0;
+    placaState.y = null;
 
-    ctx.drawImage(img, 0, 0, largura, altura);
-
-    var placaX = 0;
-    var placaW = largura;
-    var padX = Math.round(placaW * 0.032);
-    var innerW = placaW - (padX * 2);
-
-    var fontTitulo = Math.max(24, Math.round(largura * 0.044));
-    var fontLbl = Math.max(11, Math.round(largura * 0.0165));
-    var fontVal = Math.max(15, Math.round(largura * 0.0235));
-
-    var alturaMinimaPlaca = Math.round(altura * 0.40);
-    var topoEspaco = Math.round(fontTitulo * 2.4);
-    var rodapeEspaco = Math.round(padX * 1.1);
-    var areaLinhas = alturaMinimaPlaca - topoEspaco - rodapeEspaco;
-    var rowGap = Math.max(Math.round(fontVal * 1.85), Math.floor(areaLinhas / 7));
-
-    var placaH = topoEspaco + (7 * rowGap) + rodapeEspaco;
-    var placaY = altura - placaH;
-    if (placaY < 0) placaY = 0;
-
-    ctx.save();
-    retanguloArredondado(ctx, placaX, placaY, placaW, placaH, Math.round(largura * 0.032));
-    ctx.fillStyle = "#ffffff";
-    ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = "#94a3b8";
-    ctx.stroke();
-    ctx.restore();
-
-    var y = placaY + Math.round(fontTitulo * 1.2);
-    var batalhao = $("q-uni").value.trim().toUpperCase();
-    if (batalhao) {
-      ctx.fillStyle = "#000000";
-      ctx.font = "bold " + fontTitulo + "px Arial";
-      ctx.textAlign = "center";
-      ctx.fillText(batalhao, placaX + (placaW / 2), y, innerW);
-    }
-
-    ctx.textAlign = "left";
-    var x0 = placaX + padX;
-    var gapCol = Math.round(innerW * 0.02);
-    y += Math.round(fontTitulo * 1.45);
-
-    desenharCampoPlaca(ctx, "NOME:", $("q-nome").value.trim().toUpperCase(), x0, y, innerW, fontLbl, fontVal);
-    y += rowGap;
-
-    desenharCampoPlaca(ctx, "FILIAÇÃO:", $("q-filiacao").value.trim().toUpperCase(), x0, y, innerW, fontLbl, fontVal);
-    y += rowGap;
-
-    var wRg = Math.round(innerW * 0.48);
-    var wVulgo = innerW - wRg - gapCol;
-    desenharCampoPlaca(ctx, "RG:", $("q-rg").value.trim(), x0, y, wRg, fontLbl, fontVal);
-    desenharCampoPlaca(ctx, "VULGO:", $("q-vulgo").value.trim(), x0 + wRg + gapCol, y, wVulgo, fontLbl, fontVal);
-    y += rowGap;
-
-    var wData = Math.round(innerW * 0.25);
-    var wArt = Math.round(innerW * 0.21);
-    var wDtn = Math.round(innerW * 0.26);
-    var wDp = innerW - wData - wArt - wDtn - (gapCol * 3);
-    var cx = x0;
-    desenharCampoPlaca(ctx, "DATA:", $("q-data").value.trim(), cx, y, wData, fontLbl, fontVal);
-    cx += wData + gapCol;
-    desenharCampoPlaca(ctx, "ARTIGO:", $("q-artigo").value.trim(), cx, y, wArt, fontLbl, fontVal);
-    cx += wArt + gapCol;
-    desenharCampoPlaca(ctx, "DTN:", $("q-dtn").value.trim(), cx, y, wDtn, fontLbl, fontVal);
-    cx += wDtn + gapCol;
-    desenharCampoPlaca(ctx, "DP:", $("q-dp").value.trim().toUpperCase(), cx, y, wDp, fontLbl, fontVal);
-    y += rowGap;
-
-    var wCid = Math.round(innerW * 0.44);
-    var wBopm = Math.round(innerW * 0.25);
-    var wBopc = innerW - wCid - wBopm - (gapCol * 2);
-    cx = x0;
-    desenharCampoPlaca(ctx, "CIDADE:", $("q-cidade").value.trim().toUpperCase(), cx, y, wCid, fontLbl, fontVal);
-    cx += wCid + gapCol;
-    desenharCampoPlaca(ctx, "BOPM:", $("q-bopm").value.trim().toUpperCase(), cx, y, wBopm, fontLbl, fontVal);
-    cx += wBopm + gapCol;
-    desenharCampoPlaca(ctx, "BOPC:", $("q-bopc").value.trim().toUpperCase(), cx, y, wBopc, fontLbl, fontVal);
-    y += rowGap;
-
-    desenharCampoPlaca(ctx, "LOCALIDADE QUE ATUA:", $("q-local").value.trim().toUpperCase(), x0, y, innerW, fontLbl, fontVal);
-    y += rowGap;
-
-    desenharCampoPlaca(ctx, "OBS.:", $("q-obs").value.trim().toUpperCase(), x0, y, innerW, fontLbl, fontVal);
-
-    fotoQualFinalBase64 = canvas.toDataURL("image/jpeg", 0.92);
-    $("qual-final-img").src = fotoQualFinalBase64;
     $("qual-result-box").style.display = "block";
+    ligarEventosArrastoPlaca();
+    renderizarCanvasQualificacao(true);
     $("qual-result-box").scrollIntoView({ behavior: "smooth" });
-
-    var dtQual = $("q-data").value.trim() || getToday();
-    var nomeQual = $("q-nome").value.trim();
-    var resumoQual = (nomeQual ? "Nome: " + nomeQual + NL : "") +
-      ($("q-rg").value.trim() ? "RG: " + $("q-rg").value.trim() + NL : "") +
-      ($("q-artigo").value.trim() ? "Artigo: " + $("q-artigo").value.trim() + NL : "") +
-      ($("q-dp").value.trim() ? "DP: " + $("q-dp").value.trim() : "");
-    registrarTrabalhoSalvo("Foto e Qualificação - " + dtQual, resumoQual.trim(), fotoQualFinalBase64);
   };
   img.src = fotoQualBase64;
 }
+
 async function salvarFotoQualificacao() {
   if (!fotoQualFinalBase64) return alert("Gere a foto com placa primeiro.");
   var nomeBase = ($("q-nome").value.trim() || "Qualificacao").replace(/[^a-zA-Z0-9_-]/g, "_");
