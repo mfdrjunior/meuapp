@@ -1001,7 +1001,7 @@ function retanguloArredondado(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-var placaState = { imgObj: null, largura: 0, altura: 0, x: 0, y: null, wRatio: 1.0, hRatio: 0.40, drag: false, startX: 0, startY: 0, origX: 0, origY: 0, eventosLigados: false };
+var placaState = { imgObj: null, largura: 0, altura: 0, x: 0, y: null, wRatio: 1.0, hRatio: 0.33, drag: false, startX: 0, startY: 0, origX: 0, origY: 0, eventosLigados: false };
 
 function desenharCampoPlaca(ctx, lbl, val, x, y, wColuna, fontLbl, fontVal) {
   ctx.fillStyle = "#000000";
@@ -1039,19 +1039,18 @@ function renderizarCanvasQualificacao(salvarHistorico) {
   var padX = Math.round(placaW * 0.032);
   var innerW = placaW - (padX * 2);
 
-  var escalaFonte = placaState.wRatio;
-  var fontTitulo = Math.max(22, Math.round(largura * 0.044 * escalaFonte));
-  var fontLbl = Math.max(13, Math.round(largura * 0.021 * escalaFonte));
-  var fontVal = Math.max(15, Math.round(largura * 0.0235 * escalaFonte));
-
-  var alturaAlvo = Math.round(altura * placaState.hRatio);
-  var topoEspaco = Math.round(fontTitulo * 2.2);
-  var rodapeEspaco = Math.round(padX * 1.1);
-  var areaLinhas = alturaAlvo - topoEspaco - rodapeEspaco;
-  var rowGap = Math.max(Math.round(fontVal * 1.75), Math.floor(areaLinhas / 7));
-
-  var placaH = topoEspaco + (7 * rowGap) + rodapeEspaco;
+    var escalaFonte = placaState.wRatio;
+  var placaH = Math.round(altura * placaState.hRatio);
   if (placaH > altura) placaH = altura;
+
+  var fontTitulo = Math.max(28, Math.round(largura * 0.052 * escalaFonte));
+  var topoEspaco = Math.round(fontTitulo * 1.85);
+  var rodapeEspaco = Math.round(placaH * 0.04);
+  var areaLinhas = placaH - topoEspaco - rodapeEspaco;
+  var rowGap = Math.max(22, Math.floor(areaLinhas / 7));
+
+  var fontLbl = Math.max(16, Math.min(Math.round(rowGap * 0.56), Math.round(largura * 0.028 * escalaFonte)));
+  var fontVal = Math.max(17, Math.min(Math.round(rowGap * 0.62), Math.round(largura * 0.031 * escalaFonte)));
 
   if (placaState.y === null) {
     placaState.x = Math.round((largura - placaW) / 2);
@@ -1154,7 +1153,7 @@ function ajustarPlacaQual(tipo, delta) {
     placaState.y += delta;
   } else if (tipo === "reset") {
     placaState.wRatio = 1.0;
-    placaState.hRatio = 0.40;
+    placaState.hRatio = 0.33;
     placaState.x = 0;
     placaState.y = null;
   }
@@ -1231,7 +1230,7 @@ function gerarPlacaQualificacao() {
     placaState.largura = largura;
     placaState.altura = altura;
     placaState.wRatio = 1.0;
-    placaState.hRatio = 0.40;
+    placaState.hRatio = 0.33;
     placaState.x = 0;
     placaState.y = null;
 
