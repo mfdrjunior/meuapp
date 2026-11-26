@@ -1,7 +1,7 @@
 {
   "name": "folha-de-qru",
   "version": "1.0.0",
-  "description": "Folha de QRU, Resenha de Ocorrência e Qualificação",
+  "description": "Folha de QRU, Resenha de Ocorrência, MDIP e Qualificação",
   "scripts": {
     "build": "echo 'Pronto'"
   },
