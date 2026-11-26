@@ -30,6 +30,14 @@ jobs:
       - name: Criar plataforma Android
         run: npx cap add android
 
+      - name: Preparar e gerar ícones oficiais do APK
+        run: |
+          mkdir -p resources
+          cp www/fundo.png resources/icon.png
+          cp www/fundo.png resources/splash.png
+          npm install @capacitor/assets
+          npx capacitor-assets generate --android --iconBackgroundColor '#000000' --splashBackgroundColor '#0f172a'
+
       - name: Configurar permissões de GPS e Rede no AndroidManifest
         run: |
           MANIFEST="android/app/src/main/AndroidManifest.xml"
