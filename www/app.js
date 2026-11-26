@@ -213,9 +213,6 @@ function formatarEnderecoCompleto(raw) {
   }
   return normalizarCidadesEAcentos(titleCase(v));
 }
-
-}
-}
 function formatarTextoMilitar(raw) {
   var txt = (raw || "").trim();
   if (!txt) return "";
@@ -307,8 +304,6 @@ function formatarSiglaBatalhaoCurta(raw) {
   return formatarTextoMilitar(v);
 }
 
-}
-
 function formatarDpTexto(raw) {
   var v = (raw || "").trim();
   if (!v) return "";
@@ -373,7 +368,7 @@ function formatarHoraUnica(raw) {
   if (/^[0-9]{1,2}$/.test(v)) return two(v) + ":00";
   if (/^[0-9]{1,2}:[0-9]{2}$/.test(v)) {
     var p = v.split(":");
-    return two(p) + ":" + p;
+    return two(p.slice(0, 1).join("")) + ":" + p.slice(1, 2).join("");
   }
   return v;
 }
@@ -586,7 +581,7 @@ function consultarBairroApi(lat, lon) {
         lon: lonStr,
         lat: latStr
       }).then(function(j2) {
-        var feat = j2 && j2.features && j2.features.length > 0 ? j2.features : null;
+        var feat = j2 && j2.features && j2.features.length > 0 ? j2.features.slice(0, 1).pop() : null;
         var props = feat ? feat.properties : {};
         var b2 = props.district || props.suburb || props.neighbourhood || props.locality || props.name || "";
         var c2 = props.city || props.town || props.county || "";
@@ -1414,9 +1409,9 @@ function formatarDataHoraMilitar(dtRaw, hrRaw) {
     var dtLimpo = dt.replace(/[^0-9A-Z]/g, "");
     var matchMes = dtLimpo.match(/^([0-9]{1,2})([A-Z]{3})([0-9]{2,4})$/);
     if (matchMes) {
-      dia = two(matchMes[1]);
-      mesSigla = matchMes[2];
-      ano2 = matchMes[3].slice(-2);
+      dia = two(matchMes.slice(1, 2).join(""));
+      mesSigla = matchMes.slice(2, 3).join("");
+      ano2 = matchMes.slice(3, 4).join("").slice(-2);
     } else {
       var numsDt = dt.replace(/[^0-9]/g, "");
       if (numsDt.length === 8) {
