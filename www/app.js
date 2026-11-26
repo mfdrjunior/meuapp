@@ -137,12 +137,15 @@ function normalizarCidadesEAcentos(txt) {
 
 function titleCase(s) {
   if (!s) return "";
+  var str = String(s);
   var minusculas = new Array("de", "da", "do", "das", "dos", "e", "em", "na", "no", "nas", "nos");
-  var base = s.trim().toLowerCase().split(" ").filter(function(x) { return x !== ""; }).map(function(w, idx) {
+  var base = str.trim().toLowerCase().split(" ").filter(function(x) { return x !== ""; }).map(function(w, idx) {
     if (w.indexOf("/") > -1) {
       var p = w.split("/");
-      var left = p.charAt(0).toUpperCase() + p.slice(1);
-      var right = p.length <= 2 ? p.toUpperCase() : (p.charAt(0).toUpperCase() + p.slice(1));
+      var p0 = p.slice(0, 1).join("");
+      var p1 = p.slice(1, 2).join("");
+      var left = p0.charAt(0).toUpperCase() + p0.slice(1);
+      var right = p1.length <= 2 ? p1.toUpperCase() : (p1.charAt(0).toUpperCase() + p1.slice(1));
       return left + "/" + right;
     }
     if (idx > 0 && minusculas.indexOf(w) > -1) return w;
@@ -155,16 +158,25 @@ function formatarEnderecoCompleto(raw) {
   var v = (raw || "").trim();
   if (!v) return "";
   var limpo = v.replace(/,/g, " ").replace(/\s+-\s+/g, " ").replace(/\s+/g, " ").trim();
+  var mApenasNum = limpo.match(/^(.+?)\s+([0-9]+[a-zA-Z0-9\-\/]*|s\/n)$/i);
+  if (mApenasNum) {
+    var logrSimples = titleCase(mApenasNum.slice(1, 2).join(""));
+    var numSimples = mApenasNum.slice(2, 3).join("").toUpperCase();
+    return logrSimples + ", " + (numSimples === "S/N" ? "s/n" : numSimples);
+  }
   var m = limpo.match(/^(.+?)\s+([0-9]+[a-zA-Z0-9\-\/]*|s\/n)\s+(.+)$/i);
   if (m) {
-    var logr = titleCase(m);
-    var num = m.toUpperCase() === "S/N" ? "s/n" : m.toUpperCase();
-    var resto = m.trim();
+    var m1 = m.slice(1, 2).join("");
+    var m2 = m.slice(2, 3).join("");
+    var m3 = m.slice(3, 4).join("");
+    var logr = titleCase(m1);
+    var num = m2.toUpperCase() === "S/N" ? "s/n" : m2.toUpperCase();
+    var resto = m3.trim();
     var ufMatch = resto.match(/^(.*?)[\s\/\-]+(sp|rj|mg|pr|sc|rs|es|ba|go|df|ms|mt)$/i);
     var uf = "";
     if (ufMatch) {
-      resto = ufMatch.trim();
-      uf = "/" + ufMatch.toUpperCase();
+      resto = ufMatch.slice(1, 2).join("").trim();
+      uf = "/" + ufMatch.slice(2, 3).join("").toUpperCase();
     }
     var palavrasResto = resto.split(" ").filter(function(x) { return x !== ""; });
     if (palavrasResto.length >= 2) {
@@ -200,6 +212,9 @@ function formatarEnderecoCompleto(raw) {
     return logr + ", " + num + " - " + titleCase(resto) + uf;
   }
   return normalizarCidadesEAcentos(titleCase(v));
+}
+
+}
 }
 function formatarTextoMilitar(raw) {
   var txt = (raw || "").trim();
@@ -280,15 +295,18 @@ function formatarSiglaBatalhaoCurta(raw) {
   var up = v.toUpperCase();
   var m = up.match(/^([0-9]+)\s*[°º]?\s*(BAEP|BPMI|BPM\/I|I|BPMM|BPM\/M|M|BPCHQ|CAEP|PAEP)(.*)$/);
   if (m) {
-    var num = m;
-    var tipo = m;
-    var resto = m ? titleCase(m.trim()) : "";
+    var num = m.slice(1, 2).join("");
+    var tipo = m.slice(2, 3).join("");
+    var restoRaw = m.slice(3, 4).join("").trim();
+    var resto = restoRaw ? titleCase(restoRaw) : "";
     if (tipo === "BPMI" || tipo === "I") tipo = "BPM/I";
     if (tipo === "BPMM" || tipo === "M") tipo = "BPM/M";
     if (tipo === "BPCHQ") tipo = "BPChq";
     return num + "º " + tipo + (resto ? " " + resto : "");
   }
   return formatarTextoMilitar(v);
+}
+
 }
 
 function formatarDpTexto(raw) {
@@ -1511,7 +1529,7 @@ function gerarDadosResenha() {
     addTopo(bat);
   }
 
-  html += '<div class="res-title">RESENHA DE OCORRÊNCIA</div>';
+  html += '<div class="res-title">RESENHA DE OCORRÊNCIA</div><div class="res-gap"></div>';
   txtWpp += NL + "*RESENHA DE OCORRÊNCIA*" + NL + NL;
   txtPuro += NL + "RESENHA DE OCORRÊNCIA" + NL + NL;
 
