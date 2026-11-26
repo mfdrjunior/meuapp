@@ -575,16 +575,16 @@ function consultarBairroApi(lat, lon) {
     throw new Error("Apenas cidade no ArcGIS");
   }).catch(function() {
     var urlNom = new Array("https:/", "nominatim.openstreetmap.org", "reverse").join("/");
-    return httpGetJson(urlNom, {
+       return httpGetJson(urlNom, {
       format: "jsonv2",
       lat: String(lat),
       lon: String(lon),
-      zoom: "16",
+      zoom: "18",
       "accept-language": "pt-BR"
     }).then(function(j3) {
       var a3 = j3 && j3.address ? j3.address : {};
       var c3 = a3.city || a3.town || a3.municipality || "";
-      var b3 = a3.suburb || a3.neighbourhood || a3.quarter || a3.city_district || a3.residential || "";
+      var b3 = a3.neighbourhood || a3.quarter || a3.suburb || a3.city_district || a3.residential || "";
       if (b3 && b3.toLowerCase() !== c3.toLowerCase()) {
         return { bairro: b3, cidade: c3 };
       }
