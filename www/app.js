@@ -2088,7 +2088,9 @@ function obterTextoEditadoMdip(modoWpp) {
         linhas.push("");
       } else {
         var txt = (el.innerText || el.textContent || "").trim();
-        if (modoWpp && (el.className === "res-center" || el.className === "res-title" || el.className === "mdip-title")) {
+                if (modoWpp && el.className === "mdip-title") {
+          linhas.push("*Morte Decorrente de Intervenção Policial*");
+        } else if (modoWpp && (el.className === "res-center" || el.className === "res-title")) {
           linhas.push("*" + txt + "*");
         } else if (modoWpp && txt.indexOf(":") > -1 && el.querySelector("b")) {
           var idxDoisPontos = txt.indexOf(":");
