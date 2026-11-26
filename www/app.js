@@ -677,7 +677,7 @@ function startGps() {
       processarPosicaoGps(p.coords.latitude, p.coords.longitude);
     }, function(err) {
       $("gps-info").textContent = "Aviso GPS: " + err.message;
-    }, { enableHighAccuracy: true });
+        }, { enableHighAccuracy: true, maximumAge: 0 });
   }
 
   timerId = setInterval(function() {
@@ -721,7 +721,7 @@ function testarGpsAgora() {
       });
   }, function(err) {
     $("gps-info").textContent = "Erro no satélite GPS: " + err.message;
-  }, { enableHighAccuracy: true, timeout: 10000 });
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
 }
 function fmtHora(d) { return two(d.getHours()) + ":" + two(d.getMinutes()); }
 
