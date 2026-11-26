@@ -555,65 +555,59 @@ function httpGetJson(url, paramsObj) {
     })
     .then(function(txt) {
       return parseJsonSeguro(txt);
-    })
-    .catch(function() {
-      var CapHttp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp;
-      if (CapHttp && CapHttp.get) {
-        return CapHttp.get({ url: fullUrl }).then(function(res) {
-          if (res.status >= 200 && res.status < 300) {
-            return parseJsonSeguro(res.data);
-          }
-          throw new Error("Status " + res.status);
-        });
-      }
-      throw new Error("Sem conexão");
     });
 }
 
 function consultarBairroApi(lat, lon) {
-  var latStr = String(lat);
-  var lonStr = String(lon);
-  return httpGetJson("https://arcgis.com", {
-    location: lonStr + "," + latStr,
-    langCode: "pt",
-    f: "pjson"
-  })
-    .then(function(j0) {
+  var NativeGeo = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.NativeGeocoder;
+  var tentarNativo = (NativeGeo && NativeGeo.reverseGeocode)
+    ? NativeGeo.reverseGeocode({
+        latitude: Number(lat),
+        longitude: Number(lon),
+        useLocale: true,
+        maxResults: 3
+      }).then(function(res) {
+        var lista = (res && res.addresses) ? res.addresses : (Array.isArray(res) ? res : new Array());
+        if (lista.length > 0) {
+          var end = lista.slice(0, 1).pop();
+          var bNat = end.subLocality || end.subAdministrativeArea || end.thoroughfare || "";
+          var cNat = end.locality || end.subAdministrativeArea || "";
+          if (bNat) return { bairro: bNat, cidade: cNat };
+        }
+        throw new Error("Sem bairro nativo");
+      })
+    : Promise.reject(new Error("Sem plugin nativo"));
+
+  return tentarNativo.catch(function() {
+    var urlArcGis = new Array("https:/", "://arcgis.com", "arcgis", "rest", "services", "World", "GeocodeServer", "reverseGeocode").join("/");
+    return httpGetJson(urlArcGis, {
+      location: String(lon) + "," + String(lat),
+      langCode: "pt",
+      f: "pjson"
+    }).then(function(j0) {
       var addr0 = j0 && j0.address ? j0.address : {};
       var b0 = addr0.Neighborhood || addr0.District || addr0.Subregion || "";
       var c0 = addr0.City || addr0.MetroArea || "";
       if (b0) return { bairro: b0, cidade: c0 };
       throw new Error("Sem bairro ArcGIS");
-    })
-    .catch(function() {
-      return httpGetJson("https://bigdatacloud.net", {
-        latitude: latStr,
-        longitude: lonStr,
-        localityLanguage: "pt"
-      }).then(function(j) {
-        var bairro = j.locality || "";
-        var cidade = j.city || "";
-        if (!bairro && j.localityInfo && j.localityInfo.administrative) {
-          var adm = j.localityInfo.administrative;
-          if (adm.length > 0) bairro = adm[adm.length - 1].name || "";
-        }
-        if (bairro) return { bairro: bairro, cidade: cidade };
-        throw new Error("Sem bairro BDC");
-      });
-    })
-    .catch(function() {
-      return httpGetJson("https://komoot.io", {
-        lon: lonStr,
-        lat: latStr
-      }).then(function(j2) {
-        var feat = j2 && j2.features && j2.features.length > 0 ? j2.features.slice(0, 1).pop() : null;
-        var props = feat ? feat.properties : {};
-        var b2 = props.district || props.suburb || props.neighbourhood || props.locality || props.name || "";
-        var c2 = props.city || props.town || props.county || "";
-        if (b2) return { bairro: b2, cidade: c2 };
-        throw new Error("Sem bairro Photon");
-      });
     });
+  }).catch(function() {
+    var urlBdc = new Array("https:/", "api.bigdatacloud.net", "data", "reverse-geocode-client").join("/");
+    return httpGetJson(urlBdc, {
+      latitude: String(lat),
+      longitude: String(lon),
+      localityLanguage: "pt"
+    }).then(function(j) {
+      var bairro = j.locality || "";
+      var cidade = j.city || "";
+      if (!bairro && j.localityInfo && j.localityInfo.administrative) {
+        var adm = j.localityInfo.administrative;
+        if (adm.length > 0) bairro = adm[adm.length - 1].name || "";
+      }
+      if (bairro) return { bairro: bairro, cidade: cidade };
+      throw new Error("Sem bairro BDC");
+    });
+  });
 }
 
 function processarPosicaoGps(lat, lon) {
