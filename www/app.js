@@ -230,8 +230,8 @@ function formatarTextoMilitar(raw) {
   txt = txt.replace(/\b([a-zA-Z])-?([0-9]{4,5})\b/g, function(all, l, n) {
     return l.toUpperCase() + "-" + n;
   });
-    txt = txt.replace(/\b(ten(?:ente)?\s*cel(?:onel)?|tencel|tc)\s*(?:pm\s+)?([a-zA-ZÀ-ÿ]+)/gi, function(all, g, nome) {
-    return "Ten Cel PM " + titleCase(nome);
+  txt = txt.replace(/\b(ten(?:ente)?\s*cel(?:onel)?|tencel|tc)\s*(?:pm\s+)?([a-zA-ZÀ-ÿ]+)/gi, function(all, g, nome) {
+    return "###TENCEL### " + titleCase(nome);
   });
   txt = txt.replace(/\b([1-3])\s*[°º]?\s*(sgt|ten|sargento|tenente)\s*(?:pm\s+)?([a-zA-ZÀ-ÿ]+)/gi, function(all, n, g, nome) {
     return n + "° " + (g.toLowerCase().indexOf("ten") === 0 ? "Ten" : "Sgt") + " PM " + titleCase(nome);
@@ -249,6 +249,8 @@ function formatarTextoMilitar(raw) {
     else if (gl.indexOf("asp") === 0) gr = "Asp";
     return gr + " PM " + titleCase(nome);
   });
+  txt = txt.split("###TENCEL###").join("Ten Cel PM");
+
   return normalizarCidadesEAcentos(txt);
 }
 
