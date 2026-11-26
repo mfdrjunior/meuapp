@@ -527,30 +527,32 @@ function onBodyKey(e) {
     }
   }
 }
+function montarUrlComParams(baseUrl, paramsObj) {
+  if (!paramsObj) return baseUrl;
+  var partes = new Array();
+  var chaves = Object.keys(paramsObj);
+  for (var i = 0; i < chaves.length; i++) {
+    var k = chaves[i];
+    partes.push(encodeURIComponent(k) + "=" + encodeURIComponent(paramsObj[k]));
+  }
+  return baseUrl + String.fromCharCode(63) + partes.join(String.fromCharCode(38));
+}
+
 function httpGetJson(url, paramsObj) {
+  var fullUrl = montarUrlComParams(url, paramsObj);
   var CapHttp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp;
   if (CapHttp && CapHttp.get) {
-    var req = {
-      url: url,
+    return CapHttp.get({
+      url: fullUrl,
       headers: {
-        "Accept": "application/json",
-        "User-Agent": "FolhaDeQRU-Android/1.0"
+        "User-Agent": "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36"
       }
-    };
-    if (paramsObj) req.params = paramsObj;
-    return CapHttp.get(req).then(function(res) {
+    }).then(function(res) {
       if (res.status >= 200 && res.status < 300) {
         return typeof res.data === "string" ? JSON.parse(res.data) : res.data;
       }
       throw new Error("Status " + res.status);
     });
-  }
-  var fullUrl = url;
-  if (paramsObj) {
-    var qs = Object.keys(paramsObj).map(function(k) {
-      return encodeURIComponent(k) + "=" + encodeURIComponent(paramsObj[k]);
-    }).join("&");
-    fullUrl = url + "?" + qs;
   }
   return fetch(fullUrl).then(function(r) {
     if (!r.ok) throw new Error("HTTP " + r.status);
@@ -561,20 +563,33 @@ function httpGetJson(url, paramsObj) {
 function consultarBairroApi(lat, lon) {
   var latStr = String(lat);
   var lonStr = String(lon);
-  return httpGetJson("https://bigdatacloud.net", {
-    latitude: latStr,
-    longitude: lonStr,
-    localityLanguage: "pt"
+  return httpGetJson("https://arcgis.com", {
+    location: lonStr + "," + latStr,
+    langCode: "pt",
+    f: "pjson"
   })
-    .then(function(j) {
-      var bairro = j.locality || "";
-      var cidade = j.city || "";
-      if (!bairro && j.localityInfo && j.localityInfo.administrative) {
-        var adm = j.localityInfo.administrative;
-        if (adm.length > 0) bairro = adm[adm.length - 1].name || "";
-      }
-      if (bairro) return { bairro: bairro, cidade: cidade };
-      throw new Error("Sem bairro");
+    .then(function(j0) {
+      var addr0 = j0 && j0.address ? j0.address : {};
+      var b0 = addr0.Neighborhood || addr0.District || addr0.Subregion || "";
+      var c0 = addr0.City || addr0.MetroArea || "";
+      if (b0) return { bairro: b0, cidade: c0 };
+      throw new Error("Sem bairro ArcGIS");
+    })
+    .catch(function() {
+      return httpGetJson("https://bigdatacloud.net", {
+        latitude: latStr,
+        longitude: lonStr,
+        localityLanguage: "pt"
+      }).then(function(j) {
+        var bairro = j.locality || "";
+        var cidade = j.city || "";
+        if (!bairro && j.localityInfo && j.localityInfo.administrative) {
+          var adm = j.localityInfo.administrative;
+          if (adm.length > 0) bairro = adm[adm.length - 1].name || "";
+        }
+        if (bairro) return { bairro: bairro, cidade: cidade };
+        throw new Error("Sem bairro BDC");
+      });
     })
     .catch(function() {
       return httpGetJson("https://komoot.io", {
@@ -591,7 +606,7 @@ function consultarBairroApi(lat, lon) {
     })
     .catch(function() {
       return httpGetJson("https://openstreetmap.org", {
-        format: "json",
+        format: "jsonv2",
         lat: latStr,
         lon: lonStr,
         "accept-language": "pt-BR"
