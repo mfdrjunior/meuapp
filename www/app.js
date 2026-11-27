@@ -94,10 +94,7 @@ function formatarCabecalhoQruTexto(modoWpp) {
 }
 
 function formatarCorpoQruWpp(txt) {
-  if (!txt) return "";
-  return txt.split(NL).map(function(linha) {
-    return linha.replace(/^([0-9]+\.\s*(?:Das\s+[0-9: ]+\s+às\s+[0-9: ]+|Às\s+[0-9: ]+)\s*-)/i, "*$1*");
-  }).join(NL);
+  return txt || "";
 }
 
 function copiarFallback(txt, msgOk) {
@@ -2510,11 +2507,44 @@ async function baixarOuSalvarDireto(nomeArquivo, conteudo, isBase64) {
 }
 
 function imprimirSecao(idElemento) {
-  var el = $(idElemento); if (!el) return window.print();
-  var conteudo = (idElemento === "qual-result-box" && fotoQualFinalBase64) ? '<img src="' + fotoQualFinalBase64 + '" style="max-width:100%;height:auto;">' : el.innerHTML;
-  var win = window.open("", "_blank"); if (!win) return window.print();
-  win.document.write('<html><head><title>Impressão</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#000;}textarea{width:100%;border:none;font-family:Arial,sans-serif;font-size:14px;}</style></head><body>' + conteudo + '</body></html>');
-  win.document.close(); win.focus(); setTimeout(function() { win.print(); win.close(); }, 300);
+  var el = $(idElemento);
+  if (!el) return window.print();
+
+  var area = $("print-only-area");
+  if (!area) {
+    area = document.createElement("div");
+    area.id = "print-only-area";
+    document.body.appendChild(area);
+  }
+
+  if (idElemento === "qual-result-box" && fotoQualFinalBase64) {
+    area.innerHTML = '<img src="' + fotoQualFinalBase64 + '" style="max-width:100%;height:auto;">';
+  } else if (idElemento === "print-box") {
+    var clone = el.cloneNode(true);
+    var taOrig = $("txt-body");
+    var taClone = clone.querySelector("#txt-body");
+    if (taOrig && taClone) {
+      var divTxt = document.createElement("div");
+      divTxt.style.whiteSpace = "pre-wrap";
+      divTxt.style.textAlign = "justify";
+      divTxt.style.fontSize = "13.5px";
+      divTxt.style.lineHeight = "1.5";
+      divTxt.textContent = taOrig.value;
+      taClone.parentNode.replaceChild(divTxt, taClone);
+    }
+    area.innerHTML = clone.innerHTML;
+  } else {
+    area.innerHTML = el.innerHTML;
+  }
+
+  setTimeout(function() {
+    window.print();
+    setTimeout(function() {
+      area.innerHTML = "";
+    }, 500);
+  }, 150);
+}
+
 }
 
 async function salvarResenhaCelular() { var txt = obterTextoEditadoResenha(false); if (!txt) return alert("Preencha os dados da resenha primeiro."); var dt = getToday(); registrarTrabalhoSalvo("Resenha de Ocorrência - " + dt, txt, ""); var bopm = ($("r-bopm").value.trim() || dt).replace(/[^a-zA-Z0-9_-]/g, "_"); await baixarOuSalvarDireto("Resenha_" + bopm + ".txt", txt, false); }
