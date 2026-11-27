@@ -945,8 +945,7 @@ function startGps() {
     } else {
       watchId = (retWatcher && typeof retWatcher === "object") ? retWatcher.id : retWatcher;
     }
-  }
-    });
+      });
   } else {
     if (!navigator.geolocation) return alert("Sem GPS neste aparelho.");
     watchId = navigator.geolocation.watchPosition(function(p) {
