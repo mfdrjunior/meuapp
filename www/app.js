@@ -909,7 +909,8 @@ function startGps() {
   var BgGps = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BackgroundGeolocation;
 
   if (BgGps) {
-    BgGps.addWatcher(
+      if (BgGps) {
+    var retWatcher = BgGps.addWatcher(
       {
         backgroundTitle: "Patrulhamento GPS Ativo",
         backgroundMessage: "Registrando bairros para Folha de QRU.",
@@ -931,12 +932,20 @@ function startGps() {
           processarPosicaoGps(location.latitude, location.longitude);
         }
       }
-    ).then(function(id) {
-      if (gpsParadoManualmente) {
-        BgGps.removeWatcher({ id: id });
-      } else {
-        watchId = id;
-      }
+    );
+    if (retWatcher && typeof retWatcher.then === "function") {
+      retWatcher.then(function(res) {
+        var id = (res && typeof res === "object") ? res.id : res;
+        if (gpsParadoManualmente && id) {
+          BgGps.removeWatcher({ id: id });
+        } else {
+          watchId = id;
+        }
+      });
+    } else {
+      watchId = (retWatcher && typeof retWatcher === "object") ? retWatcher.id : retWatcher;
+    }
+  }
     });
   } else {
     if (!navigator.geolocation) return alert("Sem GPS neste aparelho.");
